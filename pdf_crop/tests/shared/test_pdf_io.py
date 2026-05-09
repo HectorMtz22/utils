@@ -41,4 +41,5 @@ def test_write_subset_preserves_order(ten_page_pdf, tmp_path):
     write_subset(reader, [7, 2, 9], dest)
 
     out = open_pdf(dest)
-    assert page_count(out) == 3
+    extracted = [page.extract_text().strip() for page in out.pages]
+    assert extracted == ["Page 7", "Page 2", "Page 9"]
