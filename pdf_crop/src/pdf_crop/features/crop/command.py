@@ -18,7 +18,7 @@ def run(src: Path, range_expr: str | None) -> int:
         total = pdf_io.page_count(reader)
         pages = ranges.parse(range_expr, total)
         dest = output_path.resolve(src)
-        result = crop_pdf(src, pages, dest)
+        result = crop_pdf(reader, pages, dest)
     except PdfCropError as e:
         print(f"error: {e}", file=sys.stderr)
         return 2

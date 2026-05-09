@@ -56,7 +56,7 @@ class CropScreen(Screen):
             try:
                 pages = ranges.parse(input_widget.value, self.total)
                 dest = output_path.resolve(self.src)
-                result = crop_pdf(self.src, pages, dest)
+                result = crop_pdf(self.reader, pages, dest)
             except PdfCropError as e:
                 error_msg.update(f"[red]{e}[/red]")
                 return
