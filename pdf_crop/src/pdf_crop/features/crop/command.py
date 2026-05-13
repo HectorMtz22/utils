@@ -16,7 +16,7 @@ def run(
     """Crop entry point. If range_expr is None, launch the TUI; otherwise direct mode."""
     if range_expr is None:
         from pdf_crop.app import PdfCropApp
-        return PdfCropApp(src).run() or 0
+        return PdfCropApp(src, strip_metadata=strip_metadata).run() or 0
 
     try:
         reader = pdf_io.open_pdf(src)

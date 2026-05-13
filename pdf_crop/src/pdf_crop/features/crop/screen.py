@@ -14,11 +14,12 @@ from .service import crop_pdf
 class CropScreen(Screen):
     """Single-screen page picker."""
 
-    def __init__(self, src: Path) -> None:
+    def __init__(self, src: Path, *, strip_metadata: bool = False) -> None:
         super().__init__()
         self.src = src
         self.reader = pdf_io.open_pdf(src)
         self.total = pdf_io.page_count(self.reader)
+        self._strip_metadata_default = strip_metadata
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -26,7 +27,7 @@ class CropScreen(Screen):
             Static(f"File: {self.src.name}"),
             Static(f"Total pages: {self.total}"),
             Input(placeholder='e.g. 1-5,8,11-13', id="range_input"),
-            Checkbox("Remove metadata", value=False, id="strip_metadata_chk"),
+            Checkbox("Remove metadata", value=self._strip_metadata_default, id="strip_metadata_chk"),
             Static("", id="error_msg"),
             Static("", id="result_msg"),
             Button("Crop", id="crop_btn", variant="primary"),

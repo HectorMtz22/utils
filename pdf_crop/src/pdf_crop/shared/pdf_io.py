@@ -21,7 +21,7 @@ def page_count(reader: PdfReader) -> int:
     return len(reader.pages)
 
 
-def strip_metadata(writer: PdfWriter) -> None:
+def _clear_metadata(writer: PdfWriter) -> None:
     # pypdf 5.x/6.x: no public API to clear /Info or drop the catalog's XMP stream.
     info = writer._info.get_object() if writer._info is not None else None
     if info is not None:
@@ -30,9 +30,6 @@ def strip_metadata(writer: PdfWriter) -> None:
     root = writer._root_object
     if NameObject("/Metadata") in root:
         del root[NameObject("/Metadata")]
-
-
-_strip_metadata = strip_metadata
 
 
 def write_subset(
@@ -47,6 +44,6 @@ def write_subset(
     for page_number in pages:
         writer.add_page(reader.pages[page_number - 1])
     if strip_metadata:
-        _strip_metadata(writer)
+        _clear_metadata(writer)
     with dest.open("wb") as f:
         writer.write(f)
