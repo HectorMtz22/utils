@@ -43,3 +43,41 @@ def test_write_subset_preserves_order(ten_page_pdf, tmp_path):
     out = open_pdf(dest)
     extracted = [page.extract_text().strip() for page in out.pages]
     assert extracted == ["Page 7", "Page 2", "Page 9"]
+
+
+def test_write_subset_default_preserves_info(pdf_with_metadata, tmp_path):
+    reader = open_pdf(pdf_with_metadata)
+    dest = tmp_path / "subset.pdf"
+    write_subset(reader, [1], dest)
+
+    out = open_pdf(dest)
+    assert out.metadata is not None
+    assert len(out.metadata) > 0
+
+
+def test_write_subset_strip_metadata_clears_info(pdf_with_metadata, tmp_path):
+    reader = open_pdf(pdf_with_metadata)
+    dest = tmp_path / "subset.pdf"
+    write_subset(reader, [1], dest, strip_metadata=True)
+
+    out = open_pdf(dest)
+    assert not out.metadata
+
+
+def test_write_subset_strip_metadata_removes_xmp(pdf_with_metadata, tmp_path):
+    reader = open_pdf(pdf_with_metadata)
+    dest = tmp_path / "subset.pdf"
+    write_subset(reader, [1], dest, strip_metadata=True)
+
+    out = open_pdf(dest)
+    assert "/Metadata" not in out.trailer["/Root"]
+
+
+def test_write_subset_strip_metadata_no_xmp_is_noop(ten_page_pdf, tmp_path):
+    reader = open_pdf(ten_page_pdf)
+    dest = tmp_path / "subset.pdf"
+    write_subset(reader, [1], dest, strip_metadata=True)
+
+    out = open_pdf(dest)
+    assert not out.metadata
+    assert "/Metadata" not in out.trailer["/Root"]

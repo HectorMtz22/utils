@@ -32,3 +32,13 @@ def test_out_of_range_returns_2(ten_page_pdf, capsys):
     rc = run(ten_page_pdf, "100")
     assert rc == 2
     assert "error:" in capsys.readouterr().err
+
+
+def test_run_passes_strip_metadata_through(pdf_with_metadata, capsys):
+    rc = run(pdf_with_metadata, "1", strip_metadata=True)
+    assert rc == 0
+
+    expected = pdf_with_metadata.with_name("with_metadata_xmp_cropped.pdf")
+    out = open_pdf(expected)
+    assert not out.metadata
+    assert "/Metadata" not in out.trailer["/Root"]
