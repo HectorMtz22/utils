@@ -1,6 +1,9 @@
 # Local-only superpowers spec/plan workspace
 docs/superpowers/
 
+# Local-only git worktrees (created in-repo for subagent isolation)
+.worktrees/
+
 # Python
 __pycache__/
 *.py[cod]
