@@ -31,6 +31,11 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help='Page expression like "1-5,8,11-13". Omit to open the TUI.',
     )
+    parser.add_argument(
+        "--remove-metadata",
+        action="store_true",
+        help="Strip /Info dictionary and XMP /Metadata from the output PDF.",
+    )
     args = parser.parse_args(argv)
 
     try:
@@ -39,4 +44,4 @@ def main(argv: list[str] | None = None) -> int:
         print(f"error: {e}", file=sys.stderr)
         return 2
 
-    return crop_run(args.file, args.range)
+    return crop_run(args.file, args.range, strip_metadata=args.remove_metadata)
