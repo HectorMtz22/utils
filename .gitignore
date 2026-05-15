@@ -18,6 +18,7 @@ dist/
 # Virtual envs
 .venv/
 venv/
+lyrics-env/
 
 # uv
 # (uv.lock IS committed; .venv is not)
