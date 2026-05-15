@@ -5,4 +5,3 @@ A multi-project repository. Each top-level directory is a self-contained Python 
 ## Projects
 
 - [`pdf_crop/`](pdf_crop/) — CLI + TUI to extract page ranges from PDFs.
-- [`music-lyrics/`](music-lyrics/) — script to fetch synced/plain lyrics from lrclib.net for a local FLAC/MP3 library.
