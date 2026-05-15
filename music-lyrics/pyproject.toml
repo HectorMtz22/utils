@@ -1,0 +1,15 @@
+[project]
+name = "music-lyrics"
+version = "0.1.0"
+description = "Fetch synced/plain lyrics from lrclib.net for a local FLAC/MP3 library"
+requires-python = ">=3.10"
+dependencies = [
+    "requests>=2.31",
+    "mutagen>=1.47",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+]
+

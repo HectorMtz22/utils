@@ -4,7 +4,7 @@ import requests
 from mutagen.flac import FLAC
 from mutagen.id3 import ID3
 
-MUSIC_DIR = "/Volumes/music-library"  # ajusta esto
+MUSIC_DIR = os.environ.get("MUSIC_DIR", "/Volumes/music-library")
 
 def clean_title(title):
     title = re.sub(r'\(.*?\)', '', title)
