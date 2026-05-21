@@ -21,8 +21,9 @@ if ! command -v lp >/dev/null 2>&1; then
     exit 1
 fi
 
-tmp="$(mktemp -t print-qr.XXXXXX.png)"
-trap 'rm -f -- "$tmp"' EXIT
+tmp_dir="$(mktemp -d -t print-qr)"
+trap 'rm -rf -- "$tmp_dir"' EXIT INT TERM HUP
+tmp="$tmp_dir/qr.png"
 
 qrencode -s 8 -m 2 -o "$tmp" -- "$1"
 lp -o fit-to-page -- "$tmp"
