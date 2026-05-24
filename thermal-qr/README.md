@@ -10,6 +10,13 @@ The script sends raw ESC/POS bytes (`-o raw`), bypassing whatever CUPS driver th
 - An ESC/POS thermal printer installed in System Settings → Printers & Scanners
 - The printer must support the native QR command (`GS ( k`) and auto-cut (`GS V`). Most POS80 / generic ESC/POS thermals from the last decade do.
 
+For `--save` (writing a PNG instead of printing) you'll additionally need:
+
+- `qrencode` (always, when using `--save`): `brew install qrencode`
+- `imagemagick` (only when also passing a description to `--save`): `brew install imagemagick`
+
+`--save` does not invoke `lp` and does not need a printer configured.
+
 ## Usage
 
 ```bash
@@ -18,6 +25,17 @@ The script sends raw ESC/POS bytes (`-o raw`), bypassing whatever CUPS driver th
 ```
 
 The optional second argument is a description printed bold and double-size above the QR.
+
+## Save to PNG
+
+Use `--save <path>` to write the QR (and optional caption) to a PNG file instead of printing. The flag must come before the positional arguments.
+
+```bash
+./print-qr.sh --save out.png "https://example.com"
+./print-qr.sh --save out.png "https://example.com" "Scan to RSVP"
+```
+
+Without a description the file is a plain QR PNG from `qrencode`. With a description, ImageMagick composes a bold black caption above the QR on a white background. An existing file at `<path>` will be overwritten; an existing directory at `<path>` is refused.
 
 ## Changing the printer
 

@@ -4,11 +4,25 @@
 # The job is sent as raw bytes (-o raw) so the installed CUPS driver is
 # bypassed; we drive the printer directly with ESC/POS, using its native
 # QR command (GS ( k) for a single centered QR, then a full paper cut.
+#
+# With --save <path>, write a PNG to <path> instead of printing. Save mode
+# uses qrencode for the QR (and ImageMagick's `magick` to composite a bold
+# caption above it when a description is also given); it does not touch lp.
 set -euo pipefail
 
 usage() {
-    echo "Usage: print-qr.sh <text-or-url> [description]" >&2
+    echo "Usage: print-qr.sh [--save <path>] <text-or-url> [description]" >&2
 }
+
+save_path=""
+if [ "${1:-}" = "--save" ]; then
+    if [ "$#" -lt 2 ]; then
+        usage
+        exit 2
+    fi
+    save_path="$2"
+    shift 2
+fi
 
 if [ "$#" -lt 1 ] || [ "$#" -gt 2 ] || [ -z "$1" ]; then
     usage
@@ -16,6 +30,60 @@ if [ "$#" -lt 1 ] || [ "$#" -gt 2 ] || [ -z "$1" ]; then
 fi
 
 description="${2:-}"
+
+if [ -n "$save_path" ]; then
+    if [ -d "$save_path" ]; then
+        echo "Error: --save path is a directory: $save_path" >&2
+        exit 1
+    fi
+
+    if ! command -v qrencode >/dev/null 2>&1; then
+        echo "Error: qrencode not found (brew install qrencode)" >&2
+        exit 1
+    fi
+
+    if [ -n "$description" ] && ! command -v magick >/dev/null 2>&1; then
+        echo "Error: magick (ImageMagick) not found (brew install imagemagick)" >&2
+        exit 1
+    fi
+
+    # mktemp -d (not -f) because BSD mktemp doesn't substitute XXXXXX in a
+    # `-t PREFIX` template — a `mktemp -t print-qr.XXXXXX` produces a path
+    # with a literal `XXXXXX` and a random suffix appended, which makes the
+    # ".png" trick leak the actual mktemp file. A private directory + a known
+    # filename inside it is portable and atomic.
+    qr_dir=""
+    trap '[ -n "${qr_dir:-}" ] && rm -rf -- "$qr_dir"' EXIT
+    qr_dir="$(mktemp -d -t print-qr)"
+    qr_tmp="$qr_dir/qr.png"
+
+    qrencode -s 10 -m 2 -o "$qr_tmp" -- "$1"
+
+    if [ -z "$description" ]; then
+        mv -- "$qr_tmp" "$save_path"
+    else
+        # `./`-prefix a leading-dash save_path so magick doesn't parse it as
+        # an option (ImageMagick has no universal `--` separator).
+        out="$save_path"
+        case "$out" in -*) out="./$out";; esac
+
+        # label:@- reads caption text from stdin instead of inline, which
+        # disables ImageMagick's `%`-escape substitution (so a caption like
+        # "50% off" is rendered literally) and avoids @-prefix-means-file.
+        # Caption: bold black on white, ~48pt, centered with horizontal padding,
+        # vertically appended above the QR (which is already black-on-white).
+        printf '%s' "$description" | magick \
+            -background white -fill black -font Helvetica-Bold \
+            -pointsize 48 -gravity center \
+            label:@- \
+            -bordercolor white -border 40x20 \
+            "$qr_tmp" \
+            -background white -gravity center -append \
+            "$out"
+    fi
+
+    exit 0
+fi
 
 if ! command -v lp >/dev/null 2>&1; then
     echo "Error: lp (CUPS) not found" >&2
