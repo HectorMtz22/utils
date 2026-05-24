@@ -62,6 +62,26 @@ if [ -n "$save_path" ]; then
     if [ -z "$description" ]; then
         mv -- "$qr_tmp" "$save_path"
     else
+        # ImageMagick 7 on macOS ships without a font config, so `magick
+        # -list font` is empty and a font *name* like "Helvetica-Bold" can't
+        # be resolved. Point -font at an actual bold font file instead; try
+        # the usual macOS locations and use the first that exists.
+        font=""
+        for f in \
+            "/System/Library/Fonts/Supplemental/Arial Bold.ttf" \
+            "/System/Library/Fonts/Supplemental/Helvetica.ttc" \
+            "/Library/Fonts/Arial Bold.ttf" \
+            "/System/Library/Fonts/Helvetica.ttc"; do
+            if [ -f "$f" ]; then
+                font="$f"
+                break
+            fi
+        done
+        if [ -z "$font" ]; then
+            echo "Error: no bold font file found for the caption" >&2
+            exit 1
+        fi
+
         # `./`-prefix a leading-dash save_path so magick doesn't parse it as
         # an option (ImageMagick has no universal `--` separator).
         out="$save_path"
@@ -73,7 +93,7 @@ if [ -n "$save_path" ]; then
         # Caption: bold black on white, ~48pt, centered with horizontal padding,
         # vertically appended above the QR (which is already black-on-white).
         printf '%s' "$description" | magick \
-            -background white -fill black -font Helvetica-Bold \
+            -background white -fill black -font "$font" \
             -pointsize 48 -gravity center \
             label:@- \
             -bordercolor white -border 40x20 \
