@@ -88,3 +88,11 @@ def test_build_subset_returns_writer_with_selected_pages(ten_page_pdf):
     reader = open_pdf(ten_page_pdf)
     writer = build_subset(reader, [2, 4])
     assert len(writer.pages) == 2
+
+
+def test_build_subset_selects_correct_pages_in_order(ten_page_pdf):
+    from pdf_crop.shared.pdf_io import build_subset, open_pdf
+    reader = open_pdf(ten_page_pdf)
+    writer = build_subset(reader, [4, 1])
+    extracted = [p.extract_text().strip() for p in writer.pages]
+    assert extracted == ["Page 4", "Page 1"]
