@@ -1,5 +1,5 @@
 from pdf_crop.shared.pdf_io import open_pdf
-from pdf_crop.features.redact import service
+from pdf_crop.features.redact import service, text_layer
 
 
 def test_scan_counts_matches_per_category(text_pdf_factory):
@@ -54,3 +54,26 @@ def test_redact_noop_when_nothing_matches(text_pdf_factory, tmp_path):
     pages = open_pdf(out).pages
     assert "Nothing sensitive here" in pages[0].extract_text()
     assert "Still clean" in pages[1].extract_text()
+
+
+def test_scan_records_skipped_pages_on_parse_error(text_pdf_factory, monkeypatch):
+    src = text_pdf_factory([
+        "CLABE 002010077777777771 ok",
+        "second page",
+    ])
+    reader = open_pdf(src)
+
+    real_page_text = text_layer.page_text
+    calls = {"n": 0}
+
+    def flaky(page):
+        calls["n"] += 1
+        if calls["n"] == 2:  # fail on the second page scanned
+            raise ValueError("boom")
+        return real_page_text(page)
+
+    monkeypatch.setattr(text_layer, "page_text", flaky)
+
+    findings = service.scan(reader, [1, 2], categories={"clabe"}, names=[])
+    assert findings.skipped_pages == [2]
+    assert findings.summary() == {"clabe": 1}  # page 1 still processed
