@@ -56,6 +56,25 @@ def test_redact_noop_when_nothing_matches(text_pdf_factory, tmp_path):
     assert "Still clean" in pages[1].extract_text()
 
 
+def test_redact_returns_count_of_removed_matches(text_pdf_factory, tmp_path):
+    src = text_pdf_factory(["CLABE 002010077777777771 de JOSE PEREZ"])
+    reader = open_pdf(src)
+    from pypdf import PdfWriter
+    writer = PdfWriter()
+    writer.add_page(reader.pages[0])
+    count = service.redact(writer, categories={"clabe", "name"}, names=["Jose Perez"])
+    assert count == 2  # one CLABE + one name
+
+
+def test_redact_returns_zero_when_nothing_matches(text_pdf_factory):
+    src = text_pdf_factory(["nothing here"])
+    reader = open_pdf(src)
+    from pypdf import PdfWriter
+    writer = PdfWriter()
+    writer.add_page(reader.pages[0])
+    assert service.redact(writer, categories={"clabe"}, names=[]) == 0
+
+
 def test_scan_records_skipped_pages_on_parse_error(text_pdf_factory, monkeypatch):
     src = text_pdf_factory([
         "CLABE 002010077777777771 ok",

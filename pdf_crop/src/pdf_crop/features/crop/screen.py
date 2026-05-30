@@ -61,7 +61,10 @@ class CropScreen(Screen):
         return [n.strip() for n in raw.split(",") if n.strip()]
 
     def _page_has_text(self, page_number):
-        text, _ = text_layer.page_text(self.reader.pages[page_number - 1])
+        try:
+            text, _ = text_layer.page_text(self.reader.pages[page_number - 1])
+        except Exception:
+            return False
         return bool(text.strip())
 
     def _reset_preview(self):
@@ -138,12 +141,11 @@ class CropScreen(Screen):
                 writer = pdf_io.build_subset(self.reader, pages, strip_metadata=strip)
                 redacted = 0
                 if apply_redaction and self._findings is not None:
-                    redact_service.redact(
+                    redacted = redact_service.redact(
                         writer,
                         categories=self._selected_categories(),
                         names=self._names(),
                     )
-                    redacted = len(self._findings.matches)
                 with dest.open("wb") as f:
                     writer.write(f)
             except PdfCropError as e:

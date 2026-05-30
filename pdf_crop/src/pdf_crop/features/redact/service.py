@@ -33,9 +33,15 @@ def scan(reader, pages, *, categories, names):
 
 
 def redact(writer, *, categories, names):
-    """Detect and delete sensitive spans on every page of `writer` in place."""
+    """Detect and delete sensitive spans on every page of `writer` in place.
+
+    Returns the number of matches removed.
+    """
+    removed = 0
     for page in writer.pages:
         text, _ = text_layer.page_text(page)
         matches = detectors.detect(text, categories=categories, names=names)
         if matches:
             text_layer.delete_spans(page, [(m.start, m.end) for m in matches])
+            removed += len(matches)
+    return removed
