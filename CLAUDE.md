@@ -64,6 +64,8 @@ music-lyrics/lyrics-env/bin/python music-lyrics/lyrics_on_nas.py
 - **PRs:** one feature per PR; open only after code review is clean (see harness).
 - **Commit/push only when asked.** Branch off `main` first — never commit to
   `main` directly.
+- **No Claude attribution.** Don't add `Co-Authored-By: Claude …` to commit
+  messages or `🤖 Generated with Claude Code` to PR bodies.
 
 ## Workflow & agents
 
