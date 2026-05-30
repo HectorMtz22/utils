@@ -81,3 +81,10 @@ def test_write_subset_strip_metadata_no_xmp_is_noop(ten_page_pdf, tmp_path):
     out = open_pdf(dest)
     assert not out.metadata
     assert "/Metadata" not in out.trailer["/Root"]
+
+
+def test_build_subset_returns_writer_with_selected_pages(ten_page_pdf):
+    from pdf_crop.shared.pdf_io import build_subset, open_pdf
+    reader = open_pdf(ten_page_pdf)
+    writer = build_subset(reader, [2, 4])
+    assert len(writer.pages) == 2
