@@ -20,6 +20,7 @@ def page_text(page):
 
     Returns (text, charmap) where charmap[i] = (op_index, element_index, offset).
     element_index is the position inside a TJ array, or -1 for a plain string.
+    offset is the character index into str(element), not a byte offset.
     """
     return _walk(_content_stream(page))
 
