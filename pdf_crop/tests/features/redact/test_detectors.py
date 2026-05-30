@@ -54,3 +54,20 @@ def test_detects_rfc_with_homoclave():
 def test_rfc_and_curp_independent_categories():
     text = "MAHJ800101HDFRRN09"  # a valid CURP shape
     assert detect(text, categories={"rfc"}, names=[]) == []
+
+
+def test_detects_name_case_and_accent_insensitive():
+    text = "Pago a JOSE PEREZ por servicios"
+    matches = detect(text, categories={"name"}, names=["José Pérez"])
+    assert len(matches) == 1
+    assert matches[0].category == "name"
+    assert matches[0].text == "JOSE PEREZ"
+
+
+def test_ignores_blank_name_entries():
+    text = "Hola mundo"
+    assert detect(text, categories={"name"}, names=["", "   "]) == []
+
+
+def test_name_not_matched_when_category_disabled():
+    assert detect("José Pérez", categories=set(), names=["José Pérez"]) == []
