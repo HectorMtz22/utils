@@ -37,3 +37,20 @@ def test_detects_card_in_4digit_groups():
     matches = detect(text, categories={"card"}, names=[])
     assert len(matches) == 1
     assert matches[0].text == "4539 5787 6362 1486"
+
+
+def test_detects_curp():
+    text = "CURP MAHJ800101HDFRRN09 registrada"
+    matches = detect(text, categories={"curp"}, names=[])
+    assert [m.text for m in matches] == ["MAHJ800101HDFRRN09"]
+
+
+def test_detects_rfc_with_homoclave():
+    text = "RFC MAHJ800101AB1 hoy"
+    matches = detect(text, categories={"rfc"}, names=[])
+    assert [m.text for m in matches] == ["MAHJ800101AB1"]
+
+
+def test_rfc_and_curp_independent_categories():
+    text = "MAHJ800101HDFRRN09"  # a valid CURP shape
+    assert detect(text, categories={"rfc"}, names=[]) == []
