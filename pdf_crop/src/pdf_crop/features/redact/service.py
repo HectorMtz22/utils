@@ -2,13 +2,14 @@ from collections import Counter
 from dataclasses import dataclass, field
 
 from pdf_crop.features.redact import detectors, text_layer
+from pdf_crop.features.redact.detectors import Match
 
 
 @dataclass
 class Findings:
-    matches: list = field(default_factory=list)       # flat list[Match]
-    by_page: dict = field(default_factory=dict)       # 1-indexed page -> list[(Match, span)]
-    skipped_pages: list = field(default_factory=list) # pages that failed to parse
+    matches: list[Match] = field(default_factory=list)       # flat list of every Match
+    by_page: dict[int, list[Match]] = field(default_factory=dict)  # 1-indexed page -> list[Match]
+    skipped_pages: list[int] = field(default_factory=list)   # pages that failed to parse
 
     def summary(self):
         return dict(Counter(m.category for m in self.matches))
@@ -26,7 +27,7 @@ def scan(reader, pages, *, categories, names):
             continue
         matches = detectors.detect(text, categories=categories, names=names)
         if matches:
-            findings.by_page[page_number] = [(m, (m.start, m.end)) for m in matches]
+            findings.by_page[page_number] = list(matches)
             findings.matches.extend(matches)
     return findings
 
