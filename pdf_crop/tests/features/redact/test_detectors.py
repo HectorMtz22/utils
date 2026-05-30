@@ -1,3 +1,5 @@
+import unicodedata
+
 from pdf_crop.features.redact.detectors import Match, detect
 
 
@@ -86,3 +88,39 @@ def test_matches_returned_sorted_by_start():
     matches = detect(text, categories={"clabe", "name"}, names=["Jose"])
     starts = [m.start for m in matches]
     assert starts == sorted(starts)
+
+
+# Fix C1: NFD-normalised input text must produce correct offsets
+def test_detects_name_in_nfd_normalized_text():
+    text = unicodedata.normalize("NFD", "Pago a José Pérez hoy")
+    matches = detect(text, categories={"name"}, names=["José Pérez"])
+    assert len(matches) == 1
+    assert text[matches[0].start:matches[0].end] == unicodedata.normalize("NFD", "José Pérez")
+
+
+# Fix I1: CLABE must not match inside alphanumeric tokens
+def test_clabe_not_matched_inside_alphanumeric_token():
+    assert detect("ABC002010077777777771", categories={"clabe"}, names=[]) == []
+    assert detect("002010077777777771X", categories={"clabe"}, names=[]) == []
+
+
+def test_clabe_not_matched_inside_longer_digit_run():
+    assert detect("00201007777777777100", categories={"clabe"}, names=[]) == []
+
+
+# Fix I2: name matching must respect word boundaries
+def test_name_does_not_match_partial_word():
+    assert detect("Banana republic", categories={"name"}, names=["Ana"]) == []
+
+
+def test_name_matches_whole_word_only():
+    matches = detect("Ana y Banana", categories={"name"}, names=["Ana"])
+    assert len(matches) == 1
+    assert matches[0].start == 0
+
+
+# Fix m2: card with dash separators
+def test_detects_card_all_dash_groups():
+    matches = detect("4539-5787-6362-1486", categories={"card"}, names=[])
+    assert len(matches) == 1
+    assert matches[0].text == "4539-5787-6362-1486"

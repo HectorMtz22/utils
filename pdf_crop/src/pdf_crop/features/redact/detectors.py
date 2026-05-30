@@ -2,11 +2,12 @@ import re
 import unicodedata
 from dataclasses import dataclass
 
-CATEGORIES = ("clabe", "card", "rfc", "curp", "name")
+# \w boundaries so 18-digit runs embedded in alphanumeric tokens are not matched.
+_CLABE_RE = re.compile(r"(?<!\w)\d{18}(?!\w)")
 
-_CLABE_RE = re.compile(r"(?<!\d)\d{18}(?!\d)")
-
-_CARD_RE = re.compile(r"(?<!\d)(?:\d{4}[ -]){3}\d{4}(?!\d)|(?<!\d)\d{16}(?!\d)")
+# Plain 16-digit alternative also uses \w boundaries to avoid matching inside
+# alphanumeric tokens.
+_CARD_RE = re.compile(r"(?<!\w)(?:\d{4}[ -]){3}\d{4}(?!\w)|(?<!\w)\d{16}(?!\w)")
 
 _CURP_RE = re.compile(r"\b[A-Z]{4}\d{6}[HM][A-Z]{5}[A-Z0-9]\d\b")
 _RFC_RE = re.compile(r"\b[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}\b")
@@ -32,12 +33,29 @@ def _luhn_ok(digits):
     return total % 10 == 0
 
 
-def _fold(s):
-    nfkd = unicodedata.normalize("NFKD", s)
-    return "".join(c for c in nfkd if not unicodedata.combining(c)).lower()
+def _fold_with_map(s):
+    """Lowercase + strip accents; return (folded, idx_map).
+
+    idx_map[i] is the index in ``s`` of the source character that produced
+    folded character i.  This lets callers map positions in the folded string
+    back to positions in the original (possibly NFD-normalised) input.
+    """
+    folded = []
+    idx_map = []
+    for i, ch in enumerate(s):
+        for c in unicodedata.normalize("NFKD", ch):
+            if unicodedata.combining(c):
+                continue
+            folded.append(c.lower())
+            idx_map.append(i)
+    return "".join(folded), idx_map
 
 
 def _merge(matches):
+    # Among the current detector set, overlapping spans are always containment
+    # relationships (a shorter span fully inside a longer one) rather than
+    # partial cross-overlaps, so replacing with the longest span is safe and
+    # does not lose any coverage.
     matches.sort(key=lambda m: (m.start, -(m.end - m.start)))
     merged = []
     for m in matches:
@@ -71,16 +89,18 @@ def detect(text, *, categories, names):
             matches.append(Match("rfc", m.start(), m.end(), m.group()))
 
     if "name" in categories:
-        folded_text = _fold(text)
+        folded_text, text_idx_map = _fold_with_map(text)
         for name in names:
             name = name.strip()
             if not name:
                 continue
-            needle = _fold(name)
-            start = folded_text.find(needle)
-            while start != -1:
-                end = start + len(needle)
-                matches.append(Match("name", start, end, text[start:end]))
-                start = folded_text.find(needle, end)
+            needle, _ = _fold_with_map(name)
+            pattern = r"\b" + re.escape(needle) + r"\b"
+            for fm in re.finditer(pattern, folded_text):
+                fstart, fend = fm.start(), fm.end()
+                # Map folded positions back to positions in the original text.
+                orig_start = text_idx_map[fstart]
+                orig_end = text_idx_map[fend - 1] + 1
+                matches.append(Match("name", orig_start, orig_end, text[orig_start:orig_end]))
 
     return _merge(matches)
