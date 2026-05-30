@@ -1,4 +1,5 @@
 from pypdf import PdfWriter
+from pypdf.generic import ArrayObject, ContentStream, NameObject, NumberObject, TextStringObject
 
 from pdf_crop.shared.pdf_io import open_pdf
 from pdf_crop.features.redact import text_layer
@@ -51,3 +52,52 @@ def test_delete_spans_only_affects_targeted_span(text_pdf_factory, tmp_path):
     assert "002010077777777771" not in pages[0].extract_text()
     assert "Alpha" in pages[0].extract_text()
     assert "keepme" in pages[1].extract_text()
+
+
+def test_page_text_handles_page_without_contents():
+    """A blank page (get_contents() is None) must return empty text and charmap."""
+    w = PdfWriter()
+    page = w.add_blank_page(width=200, height=200)
+
+    text, charmap = text_layer.page_text(page)
+
+    assert text == ""
+    assert charmap == []
+    # delete_spans with empty spans is a true no-op; a non-empty span would
+    # IndexError because charmap is empty — tested separately as a known
+    # limitation (delete_spans is not robust to out-of-range spans on
+    # contentless pages).
+    text_layer.delete_spans(page, [])  # must not raise
+
+
+def test_tj_array_reconstruct_and_delete():
+    """The TJ (kerning array) path is exercised end-to-end."""
+    w = PdfWriter()
+    page = w.add_blank_page(width=300, height=300)
+
+    cs = ContentStream(None, None)
+    arr = ArrayObject([
+        TextStringObject("AB"),
+        NumberObject(-120),
+        TextStringObject("12345678"),
+    ])
+    cs.operations = [
+        ([], b"BT"),
+        ([arr], b"TJ"),
+        ([], b"ET"),
+    ]
+    page[NameObject("/Contents")] = cs
+
+    text, charmap = text_layer.page_text(page)
+    assert text == "AB12345678"
+    assert len(charmap) == len(text)
+
+    start = text.index("12345678")
+    text_layer.delete_spans(page, [(start, start + 8)])
+
+    text2, _ = text_layer.page_text(page)
+    assert text2 == "AB"
+
+    # The kerning number (-120) must survive in the rebuilt TJ array.
+    new_arr = page.get_contents().operations[1][0][0]
+    assert any(not hasattr(e, "lower") for e in new_arr)  # NumberObject has no .lower
