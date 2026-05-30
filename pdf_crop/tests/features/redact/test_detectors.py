@@ -71,3 +71,18 @@ def test_ignores_blank_name_entries():
 
 def test_name_not_matched_when_category_disabled():
     assert detect("José Pérez", categories=set(), names=["José Pérez"]) == []
+
+
+def test_overlapping_matches_are_merged():
+    text = "002010077777777771"
+    matches = detect(text, categories={"clabe", "card"}, names=[])
+    spans = sorted((m.start, m.end) for m in matches)
+    for (s1, e1), (s2, e2) in zip(spans, spans[1:]):
+        assert e1 <= s2
+
+
+def test_matches_returned_sorted_by_start():
+    text = "JOSE 002010077777777771"
+    matches = detect(text, categories={"clabe", "name"}, names=["Jose"])
+    starts = [m.start for m in matches]
+    assert starts == sorted(starts)
