@@ -1,6 +1,7 @@
 from pypdf.generic import (
     ByteStringObject,
     ContentStream,
+    NameObject,
     TextStringObject,
 )
 
@@ -70,7 +71,9 @@ def delete_spans(page, spans):
             operands[0][el_index] = TextStringObject(_strip(str(operands[0][el_index]), offsets))
         cs.operations[op_index] = (operands, operator)
 
-    page.replace_contents(cs)
+    # Assign directly to avoid a deprecation warning that fires when
+    # replace_contents() detects the page is still attached to a reader.
+    page[NameObject("/Contents")] = cs
 
 
 def _strip(s, offsets):
