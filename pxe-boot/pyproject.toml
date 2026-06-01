@@ -1,6 +1,6 @@
 [project]
 name = "pxe-boot"
-version = "0.1.6"
+version = "0.1.7"
 description = "macOS CLI to PXE-boot a PC on the LAN (netboot.xyz or local ISO)"
 requires-python = ">=3.12"
 dependencies = []

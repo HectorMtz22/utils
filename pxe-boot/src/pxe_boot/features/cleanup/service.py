@@ -17,5 +17,10 @@ def run() -> None:
     if s.http_pid is not None:
         http_server.stop(s.http_pid)
 
-    print("pxe-boot: services stopped. Re-run `pxe-boot --netboot` or `--iso` to start again.")
+    # Drop the state file so the next --netboot/--iso run starts fresh.
+    # Files (kpxe/efi binaries, dnsmasq.d/pxe-boot.conf) stay in place;
+    # only --uninstall removes them.
+    state.clear()
+
+    print("pxe-boot: services stopped, state cleared. Re-run `pxe-boot --netboot` or `--iso` to start again.")
     print("pxe-boot: run `pxe-boot --uninstall` to remove everything permanently.")
