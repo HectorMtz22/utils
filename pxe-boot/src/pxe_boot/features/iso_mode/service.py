@@ -10,13 +10,13 @@ from pxe_boot.shared.errors import AlreadyRunning, IsoNotFound
 from pxe_boot.shared.iso_inspect import find_boot_files
 from pxe_boot.shared.net import detect_active_iface_and_ip
 from pxe_boot.shared.paths import (
-    HTTP_SERVED_DIR, IPXE_EFI_FILE, IPXE_EFI_URL,
+    HTTP_SERVED_DIR, SNPONLY_EFI_FILE, SNPONLY_EFI_URL,
     TFTPBOOT_BACKUP, TFTP_PXE_SUBDIR, TFTP_ROOT,
     UNDIONLY_KPXE_FILE, UNDIONLY_KPXE_URL,
 )
 
 BIOS_CHAINLOADER = "undionly.kpxe"
-EFI_CHAINLOADER = "ipxe.efi"
+EFI_CHAINLOADER = "snponly.efi"
 
 
 def download_to(url: str, dest: Path) -> None:
@@ -73,7 +73,7 @@ def run(iso_path: Path, *, iface_override: str | None = None) -> None:
 
     # Download iPXE chainloaders for both archs (small — ~85 KB + ~1 MB).
     _ensure(UNDIONLY_KPXE_URL, UNDIONLY_KPXE_FILE)
-    _ensure(IPXE_EFI_URL, IPXE_EFI_FILE)
+    _ensure(SNPONLY_EFI_URL, SNPONLY_EFI_FILE)
 
     port = http_server.find_free_port()
     if bf.distro_hint == "ubuntu":
