@@ -19,19 +19,22 @@ def parse_ifconfig_inet(ifconfig_output: str) -> Optional[str]:
     return m.group(1) if m else None
 
 
-def detect_active_iface_and_ip() -> tuple[str, str]:
-    """Run `route` + `ifconfig`; raise NoNetwork if either fails."""
-    try:
-        route_out = subprocess.run(
-            ["route", "-n", "get", "default"],
-            check=True, capture_output=True, text=True,
-        ).stdout
-    except subprocess.CalledProcessError as e:
-        raise NoNetwork("no default IPv4 route") from e
-
-    iface = parse_default_iface(route_out)
-    if iface is None:
-        raise NoNetwork("could not parse default interface")
+def detect_active_iface_and_ip(iface_override: Optional[str] = None) -> tuple[str, str]:
+    """Resolve the iface + IPv4 to use. If `iface_override` is given, skip the
+    default-route lookup and only read ifconfig for that interface."""
+    if iface_override is not None:
+        iface = iface_override
+    else:
+        try:
+            route_out = subprocess.run(
+                ["route", "-n", "get", "default"],
+                check=True, capture_output=True, text=True,
+            ).stdout
+        except subprocess.CalledProcessError as e:
+            raise NoNetwork("no default IPv4 route") from e
+        iface = parse_default_iface(route_out)
+        if iface is None:
+            raise NoNetwork("could not parse default interface")
 
     try:
         ifc_out = subprocess.run(

@@ -34,11 +34,11 @@ def _backup_tftpboot_if_nonempty() -> Path | None:
     return TFTPBOOT_BACKUP
 
 
-def run() -> None:
+def run(*, iface_override: str | None = None) -> None:
     if state.load() is not None:
         raise AlreadyRunning("pxe-boot is already running; use --cleanup or --status")
 
-    iface, ip = detect_active_iface_and_ip()
+    iface, ip = detect_active_iface_and_ip(iface_override)
     backup = _backup_tftpboot_if_nonempty()
 
     if not NETBOOT_XYZ_FILE.exists() or NETBOOT_XYZ_FILE.stat().st_size == 0:

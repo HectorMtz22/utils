@@ -32,11 +32,17 @@ def _stub_mount(monkeypatch, tmp_path):
     return mp
 
 
-def _ok_stubs(monkeypatch, tmp_path):
+def _ok_stubs(monkeypatch, tmp_path, captured_override=None):
     _stub_mount(monkeypatch, tmp_path)
+
+    def _detect(iface_override=None):
+        if captured_override is not None:
+            captured_override.append(iface_override)
+        return ("en0", "192.168.1.42")
+
     monkeypatch.setattr(
         "pxe_boot.features.iso_mode.service.detect_active_iface_and_ip",
-        lambda: ("en0", "192.168.1.42"),
+        _detect,
     )
     monkeypatch.setattr("pxe_boot.shared.tftp.is_enabled", lambda: False)
     monkeypatch.setattr("pxe_boot.shared.tftp.enable", lambda **kw: None)
@@ -91,3 +97,11 @@ def test_missing_iso_raises(tmp_path, monkeypatch):
     _ok_stubs(monkeypatch, tmp_path)
     with pytest.raises(IsoNotFound):
         service.run(tmp_path / "nope.iso")
+
+
+def test_iface_override_is_forwarded(tmp_path, monkeypatch):
+    iso = _ubuntu_iso(tmp_path)
+    seen: list[str | None] = []
+    _ok_stubs(monkeypatch, tmp_path, captured_override=seen)
+    service.run(iso, iface_override="en0")
+    assert seen == ["en0"]

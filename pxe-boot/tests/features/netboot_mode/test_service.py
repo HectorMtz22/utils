@@ -27,10 +27,17 @@ def isolated_paths(tmp_path, monkeypatch):
     )
 
 
-def _ok_stubs(monkeypatch):
+def _ok_stubs(monkeypatch, captured_override=None):
+    """Stub detect_active_iface_and_ip; optionally capture the override arg
+    passed by the service into the given list."""
+    def _detect(iface_override=None):
+        if captured_override is not None:
+            captured_override.append(iface_override)
+        return ("en0", "192.168.1.42")
+
     monkeypatch.setattr(
         "pxe_boot.features.netboot_mode.service.detect_active_iface_and_ip",
-        lambda: ("en0", "192.168.1.42"),
+        _detect,
     )
     monkeypatch.setattr(
         "pxe_boot.features.netboot_mode.service.download_kpxe",
@@ -92,3 +99,17 @@ def test_skips_kpxe_download_if_present(tmp_path, monkeypatch):
     )
     service.run()
     assert calls == []
+
+
+def test_iface_override_is_forwarded(tmp_path, monkeypatch):
+    seen: list[str | None] = []
+    _ok_stubs(monkeypatch, captured_override=seen)
+    service.run(iface_override="en0")
+    assert seen == ["en0"]
+
+
+def test_no_iface_override_passes_none(tmp_path, monkeypatch):
+    seen: list[str | None] = []
+    _ok_stubs(monkeypatch, captured_override=seen)
+    service.run()
+    assert seen == [None]

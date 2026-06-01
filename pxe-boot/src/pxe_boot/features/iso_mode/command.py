@@ -7,4 +7,4 @@ from pxe_boot.shared.privileges import require_root
 
 def run(args: Namespace) -> None:
     require_root()
-    service.run(Path(args.iso))
+    service.run(Path(args.iso), iface_override=getattr(args, "iface", None))
