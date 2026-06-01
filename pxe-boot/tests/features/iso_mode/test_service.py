@@ -19,8 +19,8 @@ def isolated_paths(tmp_path, monkeypatch):
         tmp_path / "tftpboot" / "undionly.kpxe",
     )
     monkeypatch.setattr(
-        "pxe_boot.features.iso_mode.service.IPXE_EFI_FILE",
-        tmp_path / "tftpboot" / "ipxe.efi",
+        "pxe_boot.features.iso_mode.service.SNPONLY_EFI_FILE",
+        tmp_path / "tftpboot" / "snponly.efi",
     )
 
 

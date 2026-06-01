@@ -18,10 +18,16 @@ NETBOOT_XYZ_FILE_EFI = TFTP_ROOT / "netboot.xyz.efi"
 NETBOOT_XYZ_URL_EFI = "https://boot.netboot.xyz/ipxe/netboot.xyz.efi"
 
 # Mode 2 — generic iPXE chainloaders (we run our own script).
+# UEFI uses snponly.efi (rides the firmware's already-loaded SNP NIC driver),
+# not ipxe.efi (whose built-in drivers don't cover every NIC).
 UNDIONLY_KPXE_FILE = TFTP_ROOT / "undionly.kpxe"
 UNDIONLY_KPXE_URL = "https://boot.ipxe.org/undionly.kpxe"
-IPXE_EFI_FILE = TFTP_ROOT / "ipxe.efi"
-IPXE_EFI_URL = "https://boot.ipxe.org/x86_64-efi/ipxe.efi"
+SNPONLY_EFI_FILE = TFTP_ROOT / "snponly.efi"
+SNPONLY_EFI_URL = "https://boot.ipxe.org/x86_64-efi/snponly.efi"
+
+# Backward-compatible aliases.
+IPXE_EFI_FILE = SNPONLY_EFI_FILE
+IPXE_EFI_URL = SNPONLY_EFI_URL
 
 # Backward-compatible aliases (old code/tests reference these names).
 NETBOOT_XYZ_FILE = NETBOOT_XYZ_FILE_BIOS
