@@ -20,7 +20,7 @@ NETBOOT_XYZ_URL_EFI = "https://boot.netboot.xyz/ipxe/netboot.xyz.efi"
 UNDIONLY_KPXE_FILE = TFTP_ROOT / "undionly.kpxe"
 UNDIONLY_KPXE_URL = "https://boot.ipxe.org/undionly.kpxe"
 IPXE_EFI_FILE = TFTP_ROOT / "ipxe.efi"
-IPXE_EFI_URL = "https://boot.ipxe.org/ipxe.efi"
+IPXE_EFI_URL = "https://boot.ipxe.org/x86_64-efi/ipxe.efi"
 
 # Backward-compatible aliases (old code/tests reference these names).
 NETBOOT_XYZ_FILE = NETBOOT_XYZ_FILE_BIOS
