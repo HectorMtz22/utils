@@ -1,3 +1,4 @@
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -12,6 +13,16 @@ def _brew() -> str:
             "Homebrew not found; install from https://brew.sh and re-run"
         )
     return path
+
+
+def _as_invoking_user_prefix() -> list[str]:
+    """If we're root via sudo, return a `sudo -u <SUDO_USER>` prefix to drop
+    privileges. Homebrew refuses to run as root for install/uninstall."""
+    if os.geteuid() == 0:
+        sudo_user = os.environ.get("SUDO_USER")
+        if sudo_user and sudo_user != "root":
+            return ["sudo", "-u", sudo_user]
+    return []
 
 
 def prefix() -> Path:
@@ -30,11 +41,15 @@ def installed(formula: str) -> bool:
 
 
 def install(formula: str) -> None:
-    subprocess.run([_brew(), "install", formula], check=True)
+    subprocess.run(
+        _as_invoking_user_prefix() + [_brew(), "install", formula], check=True,
+    )
 
 
 def uninstall(formula: str) -> None:
-    subprocess.run([_brew(), "uninstall", formula], check=True)
+    subprocess.run(
+        _as_invoking_user_prefix() + [_brew(), "uninstall", formula], check=True,
+    )
 
 
 def services_start(formula: str) -> None:
