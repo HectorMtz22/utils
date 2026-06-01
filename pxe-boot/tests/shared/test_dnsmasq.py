@@ -20,6 +20,14 @@ def fake_pid_file(tmp_path, monkeypatch):
     return pid_file
 
 
+def _find_dnsmasq_spawn(commands: list[list[str]]) -> list[str]:
+    """Find the dnsmasq spawn command (with --conf-file) among the captured calls."""
+    for cmd in commands:
+        if cmd and cmd[0].endswith("/dnsmasq"):
+            return cmd
+    raise AssertionError(f"no dnsmasq spawn found in: {commands}")
+
+
 class TestStart:
     def test_spawns_dnsmasq_with_conf_and_pid_file(self, fake_prefix, fake_pid_file, monkeypatch):
         seen: list[list[str]] = []
@@ -30,20 +38,36 @@ class TestStart:
 
         monkeypatch.setattr("pxe_boot.shared.dnsmasq.subprocess.run", fake)
         dnsmasq.start()
-        assert seen[0][0] == "/opt/homebrew/sbin/dnsmasq"
-        assert f"--conf-file=/opt/homebrew/etc/dnsmasq.d/pxe-boot.conf" in seen[0]
-        assert f"--pid-file={fake_pid_file}" in seen[0]
+        spawn = _find_dnsmasq_spawn(seen)
+        assert spawn[0] == "/opt/homebrew/sbin/dnsmasq"
+        assert "--conf-file=/opt/homebrew/etc/dnsmasq.d/pxe-boot.conf" in spawn
+        assert f"--pid-file={fake_pid_file}" in spawn
 
     def test_clears_stale_pid_file_before_spawning(self, fake_prefix, fake_pid_file, monkeypatch):
         fake_pid_file.write_text("99999")
 
         def fake(cmd, **kw):
-            # By the time dnsmasq actually runs, the stale PID file should be gone.
-            assert not fake_pid_file.exists()
+            if cmd and cmd[0].endswith("/dnsmasq"):
+                # By the time dnsmasq actually runs, the stale PID file should be gone.
+                assert not fake_pid_file.exists()
             return subprocess.CompletedProcess(cmd, 0)
 
         monkeypatch.setattr("pxe_boot.shared.dnsmasq.subprocess.run", fake)
         dnsmasq.start()
+
+    def test_kills_stragglers_before_spawning(self, fake_prefix, fake_pid_file, monkeypatch):
+        seen: list[list[str]] = []
+
+        def fake(cmd, **kw):
+            seen.append(list(cmd))
+            return subprocess.CompletedProcess(cmd, 0)
+
+        monkeypatch.setattr("pxe_boot.shared.dnsmasq.subprocess.run", fake)
+        dnsmasq.start()
+        # Some call must be a pkill -f dnsmasq before the dnsmasq spawn.
+        pkill_idx = next(i for i, c in enumerate(seen) if c[:2] == ["pkill", "-f"])
+        spawn_idx = next(i for i, c in enumerate(seen) if c and c[0].endswith("/dnsmasq"))
+        assert pkill_idx < spawn_idx
 
 
 class TestStop:
