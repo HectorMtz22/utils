@@ -1,16 +1,33 @@
 import datetime
 import shutil
 import subprocess
+import urllib.request
 from pathlib import Path
 
 from pxe_boot.features.iso_mode import ipxe_script
-from pxe_boot.shared import dnsmasq, firewall, http_server, iso_mount, state, tftp
+from pxe_boot.shared import dnsmasq, dnsmasq_conf, firewall, http_server, iso_mount, state, tftp
 from pxe_boot.shared.errors import AlreadyRunning, IsoNotFound
 from pxe_boot.shared.iso_inspect import find_boot_files
 from pxe_boot.shared.net import detect_active_iface_and_ip
 from pxe_boot.shared.paths import (
-    HTTP_SERVED_DIR, TFTPBOOT_BACKUP, TFTP_PXE_SUBDIR, TFTP_ROOT,
+    HTTP_SERVED_DIR, IPXE_EFI_FILE, IPXE_EFI_URL,
+    TFTPBOOT_BACKUP, TFTP_PXE_SUBDIR, TFTP_ROOT,
+    UNDIONLY_KPXE_FILE, UNDIONLY_KPXE_URL,
 )
+
+BIOS_CHAINLOADER = "undionly.kpxe"
+EFI_CHAINLOADER = "ipxe.efi"
+
+
+def download_to(url: str, dest: Path) -> None:
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    with urllib.request.urlopen(url) as r, dest.open("wb") as f:
+        shutil.copyfileobj(r, f)
+
+
+def _ensure(url: str, dest: Path) -> None:
+    if not dest.exists() or dest.stat().st_size == 0:
+        download_to(url, dest)
 
 
 def _backup_tftpboot_if_nonempty() -> Path | None:
@@ -54,6 +71,10 @@ def run(iso_path: Path, *, iface_override: str | None = None) -> None:
     finally:
         iso_mount.detach(mountpoint)
 
+    # Download iPXE chainloaders for both archs (small — ~85 KB + ~1 MB).
+    _ensure(UNDIONLY_KPXE_URL, UNDIONLY_KPXE_FILE)
+    _ensure(IPXE_EFI_URL, IPXE_EFI_FILE)
+
     port = http_server.find_free_port()
     if bf.distro_hint == "ubuntu":
         script = ipxe_script.render_ubuntu(
@@ -69,13 +90,20 @@ def run(iso_path: Path, *, iface_override: str | None = None) -> None:
 
     pid = http_server.start(directory=HTTP_SERVED_DIR, port=port)
 
-    boot_file = f"pxe-boot/{iso_stem}/ipxe.script"
+    ipxe_script_rel = f"pxe-boot/{iso_stem}/ipxe.script"
     tftp_was_enabled = tftp.is_enabled()
     if not tftp_was_enabled:
         tftp.enable()
     installed_now = dnsmasq.ensure_installed()
     main_edited = dnsmasq.ensure_conf_dir_include()
-    dnsmasq.write_dropin(iface=iface, ip=ip, boot_file=boot_file)
+    dnsmasq.write_dropin_text(
+        dnsmasq_conf.render_chained(
+            iface=iface, ip=ip,
+            bios_chainloader=BIOS_CHAINLOADER,
+            efi_chainloader=EFI_CHAINLOADER,
+            ipxe_script=ipxe_script_rel,
+        )
+    )
     dnsmasq.start()
 
     state.save(state.State(
@@ -94,7 +122,8 @@ def run(iso_path: Path, *, iface_override: str | None = None) -> None:
 
     print(f"pxe-boot: mode=iso iface={iface} ip={ip}")
     print(f"  ISO: {iso_name} (hint: {bf.distro_hint})")
-    print(f"  TFTP boot file: {boot_file}")
+    print(f"  TFTP chainloaders: {BIOS_CHAINLOADER} (BIOS), {EFI_CHAINLOADER} (UEFI)")
+    print(f"  iPXE script: {ipxe_script_rel}")
     print(f"  HTTP serving {served_iso.name} at http://{ip}:{port}/")
     if bf.distro_hint == "generic":
         print("  WARNING: non-Ubuntu ISO — boot is best-effort.")

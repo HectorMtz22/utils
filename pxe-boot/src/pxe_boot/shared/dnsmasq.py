@@ -41,9 +41,16 @@ def ensure_conf_dir_include() -> bool:
 
 
 def write_dropin(*, iface: str, ip: str, boot_file: str) -> None:
+    """Write the single-boot-file dnsmasq config (Mode 1 legacy callers)."""
+    write_dropin_text(dnsmasq_conf.render(iface=iface, ip=ip, boot_file=boot_file))
+
+
+def write_dropin_text(text: str) -> None:
+    """Write a pre-rendered drop-in config. Used by callers that need a
+    multi-arch or chained config beyond the single-boot-file template."""
     path = dropin_path()
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(dnsmasq_conf.render(iface=iface, ip=ip, boot_file=boot_file))
+    path.write_text(text)
 
 
 def remove_dropin() -> None:
