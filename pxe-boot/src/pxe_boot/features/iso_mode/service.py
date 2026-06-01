@@ -27,13 +27,13 @@ def _backup_tftpboot_if_nonempty() -> Path | None:
     return TFTPBOOT_BACKUP
 
 
-def run(iso_path: Path) -> None:
+def run(iso_path: Path, *, iface_override: str | None = None) -> None:
     if state.load() is not None:
         raise AlreadyRunning("pxe-boot is already running; use --cleanup or --status")
     if not iso_path.is_file():
         raise IsoNotFound(f"{iso_path} not found")
 
-    iface, ip = detect_active_iface_and_ip()
+    iface, ip = detect_active_iface_and_ip(iface_override)
     backup = _backup_tftpboot_if_nonempty()
 
     iso_stem = iso_path.stem

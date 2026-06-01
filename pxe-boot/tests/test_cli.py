@@ -16,6 +16,42 @@ def test_help_exits_zero(capsys, monkeypatch):
     assert "--cleanup" in out
     assert "--uninstall" in out
     assert "--status" in out
+    assert "--iface" in out
+
+
+def test_iface_flag_forwards_to_netboot(monkeypatch):
+    monkeypatch.setattr(sys, "argv", ["pxe-boot", "--netboot", "--iface", "en0"])
+    seen = []
+    monkeypatch.setattr(
+        "pxe_boot.features.netboot_mode.command.run",
+        lambda args: seen.append(args.iface),
+    )
+    cli.main()
+    assert seen == ["en0"]
+
+
+def test_iface_flag_forwards_to_iso(monkeypatch, tmp_path):
+    iso = tmp_path / "x.iso"
+    iso.write_bytes(b"")
+    monkeypatch.setattr(sys, "argv", ["pxe-boot", "--iso", str(iso), "--iface", "en0"])
+    seen = []
+    monkeypatch.setattr(
+        "pxe_boot.features.iso_mode.command.run",
+        lambda args: seen.append((args.iso, args.iface)),
+    )
+    cli.main()
+    assert seen == [(str(iso), "en0")]
+
+
+def test_iface_defaults_to_none(monkeypatch):
+    monkeypatch.setattr(sys, "argv", ["pxe-boot", "--netboot"])
+    seen = []
+    monkeypatch.setattr(
+        "pxe_boot.features.netboot_mode.command.run",
+        lambda args: seen.append(args.iface),
+    )
+    cli.main()
+    assert seen == [None]
 
 
 def test_no_args_calls_interactive(monkeypatch):

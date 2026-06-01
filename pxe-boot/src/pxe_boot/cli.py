@@ -22,6 +22,10 @@ def _build_parser() -> argparse.ArgumentParser:
     group.add_argument("--cleanup", action="store_true", help="Stop services, keep installed")
     group.add_argument("--uninstall", action="store_true", help="Remove everything pxe-boot set up")
     group.add_argument("--status", action="store_true", help="Show current state")
+    p.add_argument(
+        "--iface", metavar="IFACE", default=None,
+        help="Force this network interface (e.g. en0) instead of the default-route autodetect",
+    )
     p.add_argument("--version", action="version", version=f"pxe-boot {__version__}")
     return p
 

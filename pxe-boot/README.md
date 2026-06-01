@@ -41,6 +41,10 @@ sudo pxe-boot --uninstall    # remove everything pxe-boot set up
      pxe-boot --status       # (no sudo) show current state
 ```
 
+Add `--iface IFACE` (e.g. `--iface en0`) to either mode to force a specific
+network interface instead of the default-route autodetect. Useful when the
+default route goes over Wi-Fi but PXE has to happen on Ethernet.
+
 ### Mode 1 — netboot.xyz
 
 Downloads `netboot.xyz.kpxe` into `/private/tftpboot/` and tells the PC to
