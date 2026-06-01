@@ -73,3 +73,17 @@ def test_tolerates_already_stopped_dnsmasq(tmp_path, monkeypatch):
     ))
     service.run()  # must not raise
     assert calls["disable"] == 1
+
+
+def test_clears_state_so_next_start_is_fresh(tmp_path, monkeypatch):
+    _record(monkeypatch)
+    from pxe_boot.shared import state
+    state.save(state.State(
+        mode="netboot", iface="en0", ip="1.2.3.4",
+        dnsmasq_installed_by_us=False, dnsmasq_main_conf_edited=False,
+        tftp_was_enabled_before=False,
+        started_at="x",
+    ))
+    assert state.load() is not None
+    service.run()
+    assert state.load() is None  # cleared
