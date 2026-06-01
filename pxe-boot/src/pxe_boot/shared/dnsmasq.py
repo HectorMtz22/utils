@@ -1,7 +1,10 @@
+import os
+import signal
+import subprocess
 from pathlib import Path
-from typing import Tuple
 
 from pxe_boot.shared import brew, dnsmasq_conf
+from pxe_boot.shared.paths import DNSMASQ_PID_FILE
 
 DROPIN_NAME = "pxe-boot.conf"
 CONF_DIR_LINE = "conf-dir=%s/etc/dnsmasq.d/,*.conf"
@@ -15,6 +18,10 @@ def main_conf_path() -> Path:
     return brew.prefix() / "etc" / "dnsmasq.conf"
 
 
+def _binary() -> Path:
+    return brew.prefix() / "sbin" / "dnsmasq"
+
+
 def ensure_installed() -> bool:
     """Returns True iff we installed it just now."""
     if brew.installed("dnsmasq"):
@@ -24,7 +31,9 @@ def ensure_installed() -> bool:
 
 
 def ensure_conf_dir_include() -> bool:
-    """Append `conf-dir=...` to main dnsmasq.conf iff missing. Returns True if we edited it."""
+    """Append `conf-dir=...` to main dnsmasq.conf iff missing. Returns True if we edited it.
+    Kept for backward compatibility — `start()` now points dnsmasq directly at our drop-in
+    so this is not load-bearing for runtime, but is still called by callers for state tracking."""
     main = main_conf_path()
     include_line = CONF_DIR_LINE % brew.prefix()
     if main.exists():
@@ -72,12 +81,48 @@ def revert_conf_dir_include() -> None:
 
 
 def start() -> None:
-    brew.services_start("dnsmasq")
+    """Spawn dnsmasq directly with our drop-in config. dnsmasq daemonizes itself
+    and writes its PID to DNSMASQ_PID_FILE. We bypass `brew services` to avoid
+    Homebrew formula-service quirks (e.g. missing #plist in some installs)."""
+    DNSMASQ_PID_FILE.parent.mkdir(parents=True, exist_ok=True)
+    # If a stale PID file is there from a prior failed run, remove it so
+    # dnsmasq's startup doesn't refuse.
+    try:
+        DNSMASQ_PID_FILE.unlink()
+    except FileNotFoundError:
+        pass
+    subprocess.run(
+        [
+            str(_binary()),
+            f"--conf-file={dropin_path()}",
+            f"--pid-file={DNSMASQ_PID_FILE}",
+        ],
+        check=True,
+    )
 
 
 def stop() -> None:
-    brew.services_stop("dnsmasq")
+    """Kill the dnsmasq we started, if any, then drop the PID file."""
+    if not DNSMASQ_PID_FILE.exists():
+        return
+    try:
+        pid = int(DNSMASQ_PID_FILE.read_text().strip())
+        os.kill(pid, signal.SIGTERM)
+    except (ValueError, ProcessLookupError):
+        pass
+    try:
+        DNSMASQ_PID_FILE.unlink()
+    except FileNotFoundError:
+        pass
 
 
 def running() -> bool:
-    return brew.service_running("dnsmasq")
+    """True iff the PID in DNSMASQ_PID_FILE corresponds to a live process."""
+    if not DNSMASQ_PID_FILE.exists():
+        return False
+    try:
+        pid = int(DNSMASQ_PID_FILE.read_text().strip())
+        os.kill(pid, 0)
+        return True
+    except (ValueError, OSError):
+        return False

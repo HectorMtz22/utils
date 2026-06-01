@@ -2,6 +2,7 @@ from pathlib import Path
 
 STATE_DIR = Path("/var/db/pxe-boot")
 STATE_FILE = STATE_DIR / "state.json"
+DNSMASQ_PID_FILE = STATE_DIR / "dnsmasq.pid"
 TFTP_ROOT = Path("/private/tftpboot")
 TFTP_PXE_SUBDIR = TFTP_ROOT / "pxe-boot"
 HTTP_SERVED_DIR = STATE_DIR / "http"
