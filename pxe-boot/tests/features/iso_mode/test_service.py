@@ -14,6 +14,14 @@ def isolated_paths(tmp_path, monkeypatch):
     monkeypatch.setattr("pxe_boot.features.iso_mode.service.TFTP_PXE_SUBDIR", tmp_path / "tftpboot" / "pxe-boot")
     monkeypatch.setattr("pxe_boot.features.iso_mode.service.HTTP_SERVED_DIR", tmp_path / "http")
     monkeypatch.setattr("pxe_boot.features.iso_mode.service.TFTPBOOT_BACKUP", tmp_path / "backup.tar")
+    monkeypatch.setattr(
+        "pxe_boot.features.iso_mode.service.UNDIONLY_KPXE_FILE",
+        tmp_path / "tftpboot" / "undionly.kpxe",
+    )
+    monkeypatch.setattr(
+        "pxe_boot.features.iso_mode.service.IPXE_EFI_FILE",
+        tmp_path / "tftpboot" / "ipxe.efi",
+    )
 
 
 def _ubuntu_iso(tmp_path) -> Path:
@@ -44,10 +52,16 @@ def _ok_stubs(monkeypatch, tmp_path, captured_override=None):
         "pxe_boot.features.iso_mode.service.detect_active_iface_and_ip",
         _detect,
     )
+    # Stub network download so tests don't hit the internet.
+    monkeypatch.setattr(
+        "pxe_boot.features.iso_mode.service.download_to",
+        lambda url, dest: (dest.parent.mkdir(parents=True, exist_ok=True), dest.write_bytes(b"x"))[1],
+    )
     monkeypatch.setattr("pxe_boot.shared.tftp.is_enabled", lambda: False)
     monkeypatch.setattr("pxe_boot.shared.tftp.enable", lambda **kw: None)
     monkeypatch.setattr("pxe_boot.shared.dnsmasq.ensure_installed", lambda: False)
     monkeypatch.setattr("pxe_boot.shared.dnsmasq.ensure_conf_dir_include", lambda: False)
+    monkeypatch.setattr("pxe_boot.shared.dnsmasq.write_dropin_text", lambda text: None)
     monkeypatch.setattr("pxe_boot.shared.dnsmasq.write_dropin", lambda **kw: None)
     monkeypatch.setattr("pxe_boot.shared.dnsmasq.start", lambda: None)
     monkeypatch.setattr("pxe_boot.shared.firewall.is_application_firewall_enabled", lambda: False)
