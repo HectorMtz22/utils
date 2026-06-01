@@ -64,7 +64,7 @@ def run() -> None:
         http_pid=None,
         served_dir=None,
         iso_name=None,
-        started_at=datetime.datetime.utcnow().isoformat() + "Z",
+        started_at=datetime.datetime.now(datetime.UTC).isoformat().replace("+00:00", "Z"),
     ))
 
     print(f"pxe-boot: mode=netboot iface={iface} ip={ip}")

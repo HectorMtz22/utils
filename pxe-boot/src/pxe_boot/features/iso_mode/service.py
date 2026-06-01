@@ -89,7 +89,7 @@ def run(iso_path: Path) -> None:
         http_pid=pid,
         served_dir=str(HTTP_SERVED_DIR),
         iso_name=iso_name,
-        started_at=datetime.datetime.utcnow().isoformat() + "Z",
+        started_at=datetime.datetime.now(datetime.UTC).isoformat().replace("+00:00", "Z"),
     ))
 
     print(f"pxe-boot: mode=iso iface={iface} ip={ip}")
