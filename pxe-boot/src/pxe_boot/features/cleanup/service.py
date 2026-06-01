@@ -1,3 +1,5 @@
+import subprocess
+
 from pxe_boot.shared import dnsmasq, http_server, state, tftp
 
 
@@ -7,7 +9,10 @@ def run() -> None:
         print("pxe-boot: nothing to clean up (no active state).")
         return
 
-    dnsmasq.stop()
+    try:
+        dnsmasq.stop()
+    except subprocess.CalledProcessError:
+        pass
     tftp.disable()
     if s.http_pid is not None:
         http_server.stop(s.http_pid)
