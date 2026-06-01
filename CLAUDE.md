@@ -14,6 +14,7 @@ There is no shared package — keep projects independent.
 | [`pdf_crop/`](pdf_crop/) | CLI + TUI to extract page ranges from PDFs | Python 3.12, `uv`, pytest, textual, pypdf | `uv run pytest` (reference example) |
 | [`music-lyrics/`](music-lyrics/) | Script: fetch synced/plain lyrics from lrclib.net for a local library | Python 3.9, local `lyrics-env` venv | none yet |
 | [`thermal-qr/`](thermal-qr/) | Shell script: print a QR to a macOS ESC/POS thermal printer | bash + inline `python3` | none yet |
+| [`pxe-boot/`](pxe-boot/) | macOS CLI to PXE-boot a PC on the LAN (netboot.xyz or local ISO) | Python 3.12, `uv`, pytest | `cd pxe-boot && uv run pytest` |
 
 `pdf_crop/` is the **gold-standard layout** — mirror it when a project grows
 past a single script:
