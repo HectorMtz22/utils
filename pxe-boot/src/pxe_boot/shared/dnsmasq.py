@@ -80,10 +80,32 @@ def revert_conf_dir_include() -> None:
     main.write_text("".join(kept))
 
 
+def _kill_any_dnsmasq() -> None:
+    """Kill any lingering dnsmasq before we (re)start ours. Covers three
+    cases: a stale process from our own PID file, a brew-services-managed
+    instance left over from an older pxe-boot version, and any other
+    dnsmasq holding port 67. The pkill is broad but safe in our context —
+    pxe-boot owns this dnsmasq for the duration of a session."""
+    # 1. Ours (PID-file path).
+    stop()
+    # 2. Brew-services-managed instance, if any. Errors are silenced.
+    try:
+        subprocess.run(
+            ["sudo", "brew", "services", "stop", "dnsmasq"],
+            check=False, capture_output=True,
+        )
+    except FileNotFoundError:
+        pass
+    # 3. Stragglers (e.g. from a manual brew install + launchd plist).
+    subprocess.run(["pkill", "-f", "dnsmasq"], check=False, capture_output=True)
+
+
 def start() -> None:
     """Spawn dnsmasq directly with our drop-in config. dnsmasq daemonizes itself
     and writes its PID to DNSMASQ_PID_FILE. We bypass `brew services` to avoid
     Homebrew formula-service quirks (e.g. missing #plist in some installs)."""
+    _kill_any_dnsmasq()
+
     DNSMASQ_PID_FILE.parent.mkdir(parents=True, exist_ok=True)
     # If a stale PID file is there from a prior failed run, remove it so
     # dnsmasq's startup doesn't refuse.
