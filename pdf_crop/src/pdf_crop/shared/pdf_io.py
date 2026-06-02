@@ -32,6 +32,21 @@ def _clear_metadata(writer: PdfWriter) -> None:
         del root[NameObject("/Metadata")]
 
 
+def build_subset(
+    reader: PdfReader,
+    pages: list[int],
+    *,
+    strip_metadata: bool = False,
+) -> PdfWriter:
+    """Build and return a PdfWriter with the selected 1-indexed pages."""
+    writer = PdfWriter()
+    for page_number in pages:
+        writer.add_page(reader.pages[page_number - 1])
+    if strip_metadata:
+        _clear_metadata(writer)
+    return writer
+
+
 def write_subset(
     reader: PdfReader,
     pages: list[int],
@@ -40,10 +55,6 @@ def write_subset(
     strip_metadata: bool = False,
 ) -> None:
     """Write a new PDF containing the selected 1-indexed pages, in given order."""
-    writer = PdfWriter()
-    for page_number in pages:
-        writer.add_page(reader.pages[page_number - 1])
-    if strip_metadata:
-        _clear_metadata(writer)
+    writer = build_subset(reader, pages, strip_metadata=strip_metadata)
     with dest.open("wb") as f:
         writer.write(f)
