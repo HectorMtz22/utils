@@ -91,7 +91,7 @@ ensure_gum() {
     fi
     printf 'gum is required for the menu. Install via Homebrew now? [y/N] '
     local ans
-    read -r ans
+    read -r ans || ans=""
     case "$ans" in
         [Yy]*)
             if ! brew install gum; then
