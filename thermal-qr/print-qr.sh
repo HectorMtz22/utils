@@ -251,7 +251,7 @@ run_tui() {
     if [ "$mode" = "Print" ]; then
         require_print_deps || return 1
         local printers default
-        printers="$(lpstat -p 2>/dev/null | parse_printers)"
+        printers="$(lpstat -p 2>/dev/null | parse_printers || true)"
         default="$(default_printer)"
         if [ -n "$printers" ]; then
             if [ -n "$default" ]; then
