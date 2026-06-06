@@ -238,11 +238,94 @@ do_save() {
         "$out"
 }
 
+# Interactive front-end: gather inputs via gum, then call the engine.
+# A cancelled gum prompt (Esc/Ctrl-C → non-zero) exits cleanly with no job.
+run_tui() {
+    ensure_gum || return 1
+
+    local mode
+    mode="$(gum choose --header 'Mode' 'Print' 'Save PNG')" || return 0
+    [ -n "$mode" ] || return 0
+
+    local dest=""
+    if [ "$mode" = "Print" ]; then
+        require_print_deps || return 1
+        local printers default
+        printers="$(lpstat -p 2>/dev/null | parse_printers)"
+        default="$(default_printer)"
+        if [ -n "$printers" ]; then
+            if [ -n "$default" ]; then
+                dest="$(printf '%s\n' "$printers" | gum choose --header 'Printer' --selected "$default")" || return 0
+            else
+                dest="$(printf '%s\n' "$printers" | gum choose --header 'Printer')" || return 0
+            fi
+        else
+            dest="$default"
+        fi
+        if [ -z "$dest" ]; then
+            echo "Error: no printer available" >&2
+            return 1
+        fi
+    else
+        require_qrencode || return 1
+        dest="$(gum input --header 'Save path' --value 'qr.png')" || return 0
+        [ -n "$dest" ] || return 0
+    fi
+
+    local text=""
+    while [ -z "$text" ]; do
+        text="$(gum input --header 'Text or URL' --placeholder 'https://example.com')" || return 0
+    done
+
+    local caption
+    caption="$(gum input --header 'Caption (optional)' --placeholder 'Scan to RSVP')" || return 0
+
+    if [ "$mode" = "Save PNG" ] && [ -n "$caption" ]; then
+        require_magick || return 1
+    fi
+
+    # Advanced tuning (optional; default No). Per-mode defaults shown as the value.
+    local mod="" ec=""
+    if gum confirm --default=false 'Configure advanced options?'; then
+        if [ "$mode" = "Print" ]; then
+            mod="$(gum input --header 'Module size (1-16)' --value '8')" || return 0
+            ec="$(gum choose --header 'Error correction' --selected 'M' 'L' 'M' 'Q' 'H')" || return 0
+        else
+            mod="$(gum input --header 'Module size (qrencode -s)' --value '10')" || return 0
+            ec="$(gum choose --header 'Error correction' --selected 'L' 'L' 'M' 'Q' 'H')" || return 0
+        fi
+    fi
+
+    # Summary + confirm.
+    echo
+    format_summary "$mode" "$dest" "$text" "$caption" "${mod:-default}" "${ec:-default}"
+    echo
+    gum confirm 'Proceed?' || return 0
+
+    # Apply advanced overrides only when set (keep engine defaults otherwise).
+    if [ -n "$mod" ]; then
+        export MODULE_SIZE="$mod"
+    fi
+    if [ -n "$ec" ]; then
+        export EC_LEVEL="$ec"
+    fi
+
+    if [ "$mode" = "Print" ]; then
+        export PRINTER="$dest"
+        do_print "$text" "$caption"
+    else
+        do_save "$dest" "$text" "$caption"
+        if gum confirm 'Open preview?'; then
+            open "$dest"
+        fi
+    fi
+}
+
 # --- dispatch -------------------------------------------------------------
 main() {
     if [ "$#" -eq 0 ]; then
-        usage
-        return 2
+        run_tui
+        return
     fi
 
     local save_path=""
