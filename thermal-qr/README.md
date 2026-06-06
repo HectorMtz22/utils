@@ -62,11 +62,12 @@ PRINTER=USBPRINT ./print-qr.sh "hello"
 
 ## Tuning
 
-Edit the constants near the top of the Python block:
+Two QR parameters are overridable per-invocation via environment variables
+(they also drive the TUI's "advanced options"):
 
-- `MODULE_SIZE` (1–16): dots per QR module. 8 is roughly 1mm/module at 203 DPI.
-- `EC_LEVEL`: error correction — `48`=L, `49`=M, `50`=Q, `51`=H.
+- `MODULE_SIZE`: dots per QR module. Defaults to `8` when printing (≈1mm/module
+  at 203 DPI) and `10` when saving a PNG (passed to `qrencode -s`).
+- `EC_LEVEL`: error correction, one of `L`/`M`/`Q`/`H`. Defaults to `M` when
+  printing and `L` when saving.
 
-Both values are also overridable per-invocation via the `MODULE_SIZE` and
-`EC_LEVEL` (`L`/`M`/`Q`/`H`) environment variables, e.g.
-`EC_LEVEL=H ./print-qr.sh "hello"`.
+For example: `EC_LEVEL=H MODULE_SIZE=10 ./print-qr.sh "hello"`.
