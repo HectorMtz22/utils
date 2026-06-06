@@ -58,6 +58,54 @@ ec_to_escpos() {
     esac
 }
 
+# --- TUI helpers ----------------------------------------------------------
+# Read `lpstat -p` output on stdin, emit one printer name per line.
+parse_printers() {
+    sed -nE 's/^printer ([^ ]+) .*/\1/p'
+}
+
+# Render the pre-flight summary. Args: <mode> <dest> <text> <caption> <module> <ec>
+format_summary() {
+    local mode="$1" dest="$2" text="$3" caption="$4" mod="$5" ec="$6"
+    local label="Printer: "
+    if [ "$mode" = "Save PNG" ]; then
+        label="Path:    "
+    fi
+    printf 'Mode:     %s\n' "$mode"
+    printf '%s%s\n' "$label" "$dest"
+    printf 'Text:     %s\n' "$text"
+    printf 'Caption:  %s\n' "${caption:-(none)}"
+    printf 'Module:   %s\n' "$mod"
+    printf 'EC level: %s\n' "$ec"
+}
+
+# Ensure `gum` is available, offering a one-time Homebrew install. Returns
+# non-zero (with a message) if gum can't be made available.
+ensure_gum() {
+    if command -v gum >/dev/null 2>&1; then
+        return 0
+    fi
+    if ! command -v brew >/dev/null 2>&1; then
+        echo "Error: gum not found and Homebrew unavailable (see https://github.com/charmbracelet/gum)" >&2
+        return 1
+    fi
+    printf 'gum is required for the menu. Install via Homebrew now? [y/N] '
+    local ans
+    read -r ans
+    case "$ans" in
+        [Yy]*)
+            if ! brew install gum; then
+                echo "Error: gum install failed" >&2
+                return 1
+            fi
+            ;;
+        *)
+            echo "Aborted." >&2
+            return 1
+            ;;
+    esac
+}
+
 # --- ESC/POS generation ---------------------------------------------------
 # Write the raw ESC/POS byte stream for a (optionally captioned) QR to stdout.
 # Args: <text> <description> <module-size:int> <ec-numeric:48-51>

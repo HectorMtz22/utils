@@ -95,6 +95,41 @@ test_ec_to_escpos
 test_print_honors_env_tuning
 test_print_default_tuning
 
+# --- TUI seam: parse_printers --------------------------------------------
+test_parse_printers() {
+    local out exp
+    out="$(printf 'printer POS80 is idle.  enabled since Mon\nprinter Office_LJ disabled since Tue\n' | src 'parse_printers')"
+    exp="$(printf 'POS80\nOffice_LJ')"
+    assert_eq "$out" "$exp" "parse_printers extracts printer names"
+}
+
+# --- TUI seam: format_summary --------------------------------------------
+test_format_summary_print() {
+    local out exp
+    out="$(src "format_summary 'Print' 'POS80' 'https://x' '' '8' 'M'")"
+    exp=$'Mode:     Print\nPrinter: POS80\nText:     https://x\nCaption:  (none)\nModule:   8\nEC level: M'
+    assert_eq "$out" "$exp" "format_summary renders print fields"
+}
+
+test_format_summary_save() {
+    local out exp
+    out="$(src "format_summary 'Save PNG' 'qr.png' 'https://x' 'Scan me' '10' 'L'")"
+    exp=$'Mode:     Save PNG\nPath:    qr.png\nText:     https://x\nCaption:  Scan me\nModule:   10\nEC level: L'
+    assert_eq "$out" "$exp" "format_summary renders save fields"
+}
+
+# --- TUI seam: ensure_gum error path -------------------------------------
+test_ensure_gum_no_gum_no_brew() {
+    local msg
+    msg="$(PATH=/usr/bin:/bin bash -c "source '$SCRIPT'; ensure_gum" </dev/null 2>&1)"
+    assert_contains "$msg" "gum not found" "ensure_gum errors when gum and brew are absent"
+}
+
+test_parse_printers
+test_format_summary_print
+test_format_summary_save
+test_ensure_gum_no_gum_no_brew
+
 if [ "$fails" -gt 0 ]; then
     printf '%d test(s) failed\n' "$fails" >&2
     exit 1
