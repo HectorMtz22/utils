@@ -29,6 +29,25 @@ assert_contains() { # <haystack> <needle> <name>
 # Run a snippet with print-qr.sh's functions sourced (isolated child shell).
 src() { bash -c "source '$SCRIPT'; $1"; }
 
+# --- print mode (dry-run byte stream) ------------------------------------
+# Capture as hex (od) because the ESC/POS stream contains NUL bytes, which
+# command substitution would strip from a plain string.
+dryrun_hex() { # <args...> -> hex string of the byte stream
+    PRINTQR_DRYRUN=1 "$SCRIPT" "$@" | od -An -tx1 | tr -d ' \n'
+}
+
+test_print_dryrun_contains_qr_and_payload() {
+    local hex
+    hex="$(dryrun_hex "hello")"
+    assert_contains "$hex" "1b40"             "print: ESC @ init present"
+    assert_contains "$hex" "1b6101"           "print: center alignment present"
+    assert_contains "$hex" "1d286b"           "print: GS ( k QR command present"
+    assert_contains "$hex" "31503068656c6c6f" "print: payload '1P0hello' embedded"
+    assert_contains "$hex" "1d5600"           "print: GS V full cut present"
+}
+
+test_print_dryrun_contains_qr_and_payload
+
 # --- save mode (characterization) ----------------------------------------
 test_save_writes_png() {
     if ! command -v qrencode >/dev/null 2>&1; then

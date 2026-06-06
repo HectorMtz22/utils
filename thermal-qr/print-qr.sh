@@ -14,6 +14,16 @@ usage() {
     echo "Usage: print-qr.sh [--save <path>] <text-or-url> [description]" >&2
 }
 
+# Destination for the ESC/POS byte stream: stdout in dry-run (for tests),
+# otherwise the raw print job to the chosen printer.
+print_sink() { # <printer>
+    if [ -n "${PRINTQR_DRYRUN:-}" ]; then
+        cat
+    else
+        lp -d "$1" -o raw -t print-qr >/dev/null
+    fi
+}
+
 save_path=""
 if [ "${1:-}" = "--save" ]; then
     if [ "$#" -lt 2 ]; then
@@ -105,23 +115,25 @@ if [ -n "$save_path" ]; then
     exit 0
 fi
 
-if ! command -v lp >/dev/null 2>&1; then
-    echo "Error: lp (CUPS) not found" >&2
-    exit 1
-fi
-
 if ! command -v python3 >/dev/null 2>&1; then
     echo "Error: python3 not found" >&2
     exit 1
 fi
 
-printer="${PRINTER:-$(lpstat -d | sed -nE 's/^system default destination: //p')}"
-if [ -z "$printer" ]; then
-    echo "Error: no default printer set (use PRINTER=<name> to override)" >&2
-    exit 1
+printer=""
+if [ -z "${PRINTQR_DRYRUN:-}" ]; then
+    if ! command -v lp >/dev/null 2>&1; then
+        echo "Error: lp (CUPS) not found" >&2
+        exit 1
+    fi
+    printer="${PRINTER:-$(lpstat -d | sed -nE 's/^system default destination: //p')}"
+    if [ -z "$printer" ]; then
+        echo "Error: no default printer set (use PRINTER=<name> to override)" >&2
+        exit 1
+    fi
 fi
 
-python3 - "$1" "$description" <<'PY' | lp -d "$printer" -o raw -t print-qr >/dev/null
+python3 - "$1" "$description" <<'PY' | print_sink "$printer"
 import sys
 
 data = sys.argv[1].encode("utf-8")
