@@ -65,6 +65,36 @@ test_save_writes_png() {
 
 test_save_writes_png
 
+# --- tuning: ec_to_escpos -------------------------------------------------
+test_ec_to_escpos() {
+    assert_eq "$(src 'ec_to_escpos L')" "48" "ec_to_escpos L -> 48"
+    assert_eq "$(src 'ec_to_escpos M')" "49" "ec_to_escpos M -> 49"
+    assert_eq "$(src 'ec_to_escpos Q')" "50" "ec_to_escpos Q -> 50"
+    assert_eq "$(src 'ec_to_escpos H')" "51" "ec_to_escpos H -> 51"
+}
+
+# --- tuning: env vars override the print stream ---------------------------
+test_print_honors_env_tuning() {
+    local hex
+    hex="$(MODULE_SIZE=5 EC_LEVEL=H dryrun_hex "hello")"
+    # GS ( k 03 00 '1' 'C' <module> -> module-size command with 0x05
+    assert_contains "$hex" "1d286b0300314305" "tuning: MODULE_SIZE=5 in stream"
+    # GS ( k 03 00 '1' 'E' <ec> -> EC command with H (0x33)
+    assert_contains "$hex" "1d286b0300314533" "tuning: EC_LEVEL=H in stream"
+}
+
+# --- tuning: defaults unchanged -------------------------------------------
+test_print_default_tuning() {
+    local hex
+    hex="$(dryrun_hex "hello")"
+    assert_contains "$hex" "1d286b0300314308" "tuning: default module size 8"
+    assert_contains "$hex" "1d286b0300314531" "tuning: default EC M (0x31=49)"
+}
+
+test_ec_to_escpos
+test_print_honors_env_tuning
+test_print_default_tuning
+
 if [ "$fails" -gt 0 ]; then
     printf '%d test(s) failed\n' "$fails" >&2
     exit 1

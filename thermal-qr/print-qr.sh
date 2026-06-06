@@ -47,6 +47,17 @@ default_printer() {
     lpstat -d 2>/dev/null | sed -nE 's/^system default destination: //p'
 }
 
+# Map a friendly EC level (L/M/Q/H) to its ESC/POS numeric code.
+ec_to_escpos() {
+    case "$1" in
+        L|l) echo 48 ;;
+        M|m) echo 49 ;;
+        Q|q) echo 50 ;;
+        H|h) echo 51 ;;
+        *) echo "Error: invalid EC_LEVEL '$1' (use L/M/Q/H)" >&2; return 1 ;;
+    esac
+}
+
 # --- ESC/POS generation ---------------------------------------------------
 # Write the raw ESC/POS byte stream for a (optionally captioned) QR to stdout.
 # Args: <text> <description> <module-size:int> <ec-numeric:48-51>
@@ -93,7 +104,9 @@ PY
 # Args: <text> <description>
 do_print() {
     local text="$1" desc="$2"
-    local mod=8 ec=49
+    local mod ec
+    mod="${MODULE_SIZE:-8}"
+    ec="$(ec_to_escpos "${EC_LEVEL:-M}")" || return 1
 
     if [ -n "${PRINTQR_DRYRUN:-}" ]; then
         if ! command -v python3 >/dev/null 2>&1; then
@@ -136,7 +149,7 @@ do_save() {
     qr_dir="$(mktemp -d -t print-qr)"
     local qr_tmp="$qr_dir/qr.png"
 
-    qrencode -s 10 -m 2 -o "$qr_tmp" -- "$text"
+    qrencode -s "${MODULE_SIZE:-10}" -m 2 -l "${EC_LEVEL:-L}" -o "$qr_tmp" -- "$text"
 
     if [ -z "$desc" ]; then
         mv -- "$qr_tmp" "$save_path"
