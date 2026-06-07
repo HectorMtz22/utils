@@ -65,6 +65,25 @@ test_save_writes_png() {
 
 test_save_writes_png
 
+# --- save mode cleans up its temp dir even on failure (regression) --------
+test_save_no_temp_leak_on_failure() {
+    if ! command -v qrencode >/dev/null 2>&1; then
+        printf 'SKIP: temp-leak test (qrencode not installed)\n'
+        return
+    fi
+    local tdir before after
+    tdir="${TMPDIR:-/tmp}"
+    before="$(find "$tdir" -maxdepth 1 -name 'print-qr*' 2>/dev/null | wc -l | tr -d ' ')"
+    # EC_LEVEL=BAD makes qrencode fail AFTER do_save has created its temp dir,
+    # so a failed save must still clean up (no leaked print-qr.* dir).
+    EC_LEVEL=BAD "$SCRIPT" --save "$tdir/leak_probe.png" "hello" >/dev/null 2>&1
+    after="$(find "$tdir" -maxdepth 1 -name 'print-qr*' 2>/dev/null | wc -l | tr -d ' ')"
+    rm -f "$tdir/leak_probe.png"
+    assert_eq "$after" "$before" "do_save leaves no temp dir when it fails"
+}
+
+test_save_no_temp_leak_on_failure
+
 # --- tuning: ec_to_escpos -------------------------------------------------
 test_ec_to_escpos() {
     assert_eq "$(src 'ec_to_escpos L')" "48" "ec_to_escpos L -> 48"

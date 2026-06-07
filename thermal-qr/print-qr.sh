@@ -189,18 +189,22 @@ do_save() {
         require_magick || return 1
     fi
 
-    # RETURN trap (not EXIT) so cleanup fires when this function returns, and
-    # can still see the function-local qr_dir; works whether called from the
-    # CLI or the TUI (which keeps running afterwards).
+    # Clean the temp dir via a RETURN trap. Every fallible step below routes
+    # failure through an explicit `return 1` instead of letting `set -e` abort
+    # mid-function, so the trap always fires — on success and on error — and
+    # works whether called from the CLI or the long-lived TUI. (An EXIT trap
+    # would not see the function-local qr_dir after the function returns.)
     local qr_dir=""
     trap '[ -n "${qr_dir:-}" ] && rm -rf -- "$qr_dir"' RETURN
     qr_dir="$(mktemp -d -t print-qr)"
     local qr_tmp="$qr_dir/qr.png"
 
-    qrencode -s "${MODULE_SIZE:-10}" -m 2 -l "${EC_LEVEL:-L}" -o "$qr_tmp" -- "$text"
+    if ! qrencode -s "${MODULE_SIZE:-10}" -m 2 -l "${EC_LEVEL:-L}" -o "$qr_tmp" -- "$text"; then
+        return 1
+    fi
 
     if [ -z "$desc" ]; then
-        mv -- "$qr_tmp" "$save_path"
+        mv -- "$qr_tmp" "$save_path" || return 1
         return
     fi
 
@@ -228,14 +232,16 @@ do_save() {
 
     # label:@- reads the caption from stdin, disabling %-escape substitution
     # (so "50% off" renders literally) and avoiding @-means-file.
-    printf '%s' "$desc" | magick \
+    if ! printf '%s' "$desc" | magick \
         -background white -fill black -font "$font" \
         -pointsize 48 -gravity center \
         label:@- \
         -bordercolor white -border 40x20 \
         "$qr_tmp" \
         -background white -gravity center -append \
-        "$out"
+        "$out"; then
+        return 1
+    fi
 }
 
 # Interactive front-end: gather inputs via gum, then call the engine.
