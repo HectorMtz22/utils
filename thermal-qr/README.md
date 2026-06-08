@@ -26,6 +26,21 @@ For `--save` (writing a PNG instead of printing) you'll additionally need:
 
 The optional second argument is a description printed bold and double-size above the QR.
 
+## Interactive TUI
+
+Run with no arguments to open an interactive menu (requires
+[`gum`](https://github.com/charmbracelet/gum): `brew install gum` — the script
+offers to install it for you on first run):
+
+```bash
+./print-qr.sh
+```
+
+It walks you through the mode (print vs. save PNG), printer (or save path),
+text/URL, optional caption, optional advanced tuning (module size, error
+correction), a confirmation summary, and — in save mode — opening the result.
+The flag-based CLI below continues to work unchanged.
+
 ## Save to PNG
 
 Use `--save <path>` to write the QR (and optional caption) to a PNG file instead of printing. The flag must come before the positional arguments.
@@ -47,7 +62,12 @@ PRINTER=USBPRINT ./print-qr.sh "hello"
 
 ## Tuning
 
-Edit the constants near the top of the Python block:
+Two QR parameters are overridable per-invocation via environment variables
+(they also drive the TUI's "advanced options"):
 
-- `MODULE_SIZE` (1–16): dots per QR module. 8 is roughly 1mm/module at 203 DPI.
-- `EC_LEVEL`: error correction — `48`=L, `49`=M, `50`=Q, `51`=H.
+- `MODULE_SIZE`: dots per QR module. Defaults to `8` when printing (≈1mm/module
+  at 203 DPI) and `10` when saving a PNG (passed to `qrencode -s`).
+- `EC_LEVEL`: error correction, one of `L`/`M`/`Q`/`H`. Defaults to `M` when
+  printing and `L` when saving.
+
+For example: `EC_LEVEL=H MODULE_SIZE=10 ./print-qr.sh "hello"`.
