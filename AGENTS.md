@@ -11,7 +11,7 @@ Two slash commands wrap the loop: **`/task-init`** (front half) and **`/task-imp
 3. **Dispatch a subagent** to implement inside that worktree, following TDD. Multiple issues → `superpowers:dispatching-parallel-agents`, one agent per worktree, in a single message.
 4. **Run `superpowers:requesting-code-review`** on each branch.
 5. **Report findings, ask before fixing** (per the user's global rule).
-6. **Open a PR** (when asked) if no Important+ findings remain, then set the Plane issue to **Done**.
+6. **Open a PR automatically** once the branch is verified, green, committed, and clean (no Important+ findings remain), then move the Plane issue to **In Review** (and to **Done** when the PR merges). Only the fix decision in step 5 waits for the user.
 
 ## Why worktrees
 
@@ -29,7 +29,7 @@ git worktree add -b <type>/<scope>-<topic> .worktrees/<topic> main
 
 Issues live in **Plane**, not in local files. Project **Utils** (identifier `UTILS`, `project_id 43bbc122-c9fe-469e-9379-db02d132a5c9`). `/task-init` files them; `/task-implement` reads and advances them.
 
-- **States:** `Todo` → `In Progress` → `Done` (resolve ids at runtime via `list_states`).
+- **States:** `Todo` → `In Progress` → `In Review` (PR open) → `Done` (merged) (resolve ids at runtime via `list_states`).
 - **Labels:** one **project** label (`pdf_crop`, `music-lyrics`, `thermal-qr`, `pxe-boot`) plus one **type** label (`feat`, `fix`, `refactor`, `test`, `docs`, `chore`) per issue (resolve via `list_labels`).
 - One issue ≈ one PR-sized chunk; independent issues enable parallel agents.
 - The issue description carries the problem/approach/code-map/test-list and a pointer to the local spec filename.
