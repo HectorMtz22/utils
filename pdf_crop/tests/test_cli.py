@@ -1,5 +1,8 @@
+import fitz
+
 from pdf_crop.cli import main
 from pdf_crop.shared.pdf_io import open_pdf
+import zbar_skip
 
 
 def test_missing_file_returns_2(tmp_path, capsys):
@@ -28,6 +31,23 @@ def test_direct_mode_dispatches_to_crop(ten_page_pdf, capsys):
     rc = main([str(ten_page_pdf), "1-2"])
     assert rc == 0
     assert (ten_page_pdf.with_name("ten_cropped.pdf")).exists()
+
+
+@zbar_skip.SKIP
+def test_cli_redact_qr_flag_removes_qr_from_output(qr_pdf_factory, capsys):
+    from PIL import Image
+    from pyzbar.pyzbar import decode
+
+    src = qr_pdf_factory(["CLABE002010077777777771"])
+    rc = main([str(src), "1", "--redact-qr"])
+    assert rc == 0
+
+    out = src.with_name(f"{src.stem}_cropped.pdf")
+    assert out.exists()
+    doc = fitz.open(str(out))
+    pix = doc[0].get_pixmap(dpi=200)
+    img = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
+    assert decode(img) == []  # QR is gone from the rendered output
 
 
 def test_cli_remove_metadata_flag_strips_info(pdf_with_metadata, capsys):

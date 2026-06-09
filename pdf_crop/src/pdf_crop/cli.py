@@ -48,6 +48,11 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Deprecated alias of --sanitize.",
     )
+    parser.add_argument(
+        "--redact-qr",
+        action="store_true",
+        help="Detect and remove QR codes / barcodes from the output PDF.",
+    )
     args = parser.parse_args(argv)
 
     try:
@@ -69,4 +74,4 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     sanitize = args.sanitize or args.remove_metadata
-    return crop_run(args.file, args.range, sanitize=sanitize)
+    return crop_run(args.file, args.range, sanitize=sanitize, redact_qr=args.redact_qr)

@@ -33,6 +33,45 @@ range or any category clears the preview, so you always confirm a fresh scan.
 generated documents, such as bank statements). Scanned or image-only pages have
 no extractable text — the preview will report that and remove nothing.
 
+## QR codes / barcodes
+
+Bank statements often embed CLABE / account / payment data in a **QR code or
+barcode** that the text-layer detectors above never see. A separate pass
+renders each page, decodes every symbol, and applies a **true** PyMuPDF
+redaction over each one — the image content is removed from the output, not
+just covered.
+
+```bash
+uv run pdfcrop Document.pdf 1-5 --redact-qr   # crop, then remove every QR/barcode
+```
+
+In the TUI, tick **Redact QR/barcodes** and press **Scan**: the preview lists
+each found code with its decoded payload, so you can confirm it's really your
+data before cropping. By default **every** detected code is redacted.
+
+This runs as a second pass over the already-cropped output, so the text-layer
+crop/redaction pipeline is untouched.
+
+### Native dependency: zbar
+
+Decoding needs the native `zbar` library (via `pyzbar`). On macOS:
+
+```bash
+brew install zbar
+```
+
+`pyzbar` looks for the dylib on the dynamic-linker path, which doesn't include
+Homebrew's prefix by default. If you hit `Unable to find zbar shared library`,
+point it at the Homebrew install:
+
+```bash
+export DYLD_LIBRARY_PATH=/opt/homebrew/opt/zbar/lib   # Apple silicon
+# export DYLD_LIBRARY_PATH=/usr/local/opt/zbar/lib    # Intel
+```
+
+The QR tests skip automatically when `zbar` isn't available, so the rest of the
+suite still runs on a machine without it.
+
 ## Develop
 
 ```bash
