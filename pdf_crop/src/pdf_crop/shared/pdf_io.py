@@ -2,8 +2,8 @@ from pathlib import Path
 
 from pypdf import PdfReader, PdfWriter
 from pypdf.errors import PdfReadError
-from pypdf.generic import NameObject
 
+from pdf_crop.features.sanitize import service as sanitize_service
 from pdf_crop.shared.errors import NotAPdf, SourceNotFound
 
 
@@ -22,14 +22,8 @@ def page_count(reader: PdfReader) -> int:
 
 
 def _clear_metadata(writer: PdfWriter) -> None:
-    # pypdf 5.x/6.x: no public API to clear /Info or drop the catalog's XMP stream.
-    info = writer._info.get_object() if writer._info is not None else None
-    if info is not None:
-        for key in list(info.keys()):
-            del info[key]
-    root = writer._root_object
-    if NameObject("/Metadata") in root:
-        del root[NameObject("/Metadata")]
+    # Exhaustive scrub lives in the sanitize feature; delegate, don't duplicate.
+    sanitize_service.sanitize(writer)
 
 
 def build_subset(
@@ -37,12 +31,17 @@ def build_subset(
     pages: list[int],
     *,
     strip_metadata: bool = False,
+    sanitize: bool = False,
 ) -> PdfWriter:
-    """Build and return a PdfWriter with the selected 1-indexed pages."""
+    """Build and return a PdfWriter with the selected 1-indexed pages.
+
+    `sanitize` (or its deprecated alias `strip_metadata`) rebuilds the subset
+    clean, stripping all non-essential metadata while keeping the text layer.
+    """
     writer = PdfWriter()
     for page_number in pages:
         writer.add_page(reader.pages[page_number - 1])
-    if strip_metadata:
+    if sanitize or strip_metadata:
         _clear_metadata(writer)
     return writer
 
@@ -53,8 +52,9 @@ def write_subset(
     dest: Path,
     *,
     strip_metadata: bool = False,
+    sanitize: bool = False,
 ) -> None:
     """Write a new PDF containing the selected 1-indexed pages, in given order."""
-    writer = build_subset(reader, pages, strip_metadata=strip_metadata)
+    writer = build_subset(reader, pages, strip_metadata=strip_metadata, sanitize=sanitize)
     with dest.open("wb") as f:
         writer.write(f)
