@@ -42,6 +42,16 @@ def test_needs_ocr_false_for_text_page(text_pdf_factory):
         doc.close()
 
 
+def test_scan_skips_text_layer_pages(text_pdf_factory):
+    # Pages with a real text layer are handled by the text-layer redactor, so
+    # the OCR pass must skip them (the needs_ocr gate) — no OCR findings even
+    # when the page text contains a CLABE. Runs without tesseract: the gate
+    # short-circuits before any OCR call.
+    src = text_pdf_factory([f"CLABE {CLABE} end"])
+    findings = service.scan(src, categories=CATS, names=[])
+    assert findings.matches == []
+
+
 @tesseract_skip.SKIP
 def test_ocr_scan_finds_clabe(image_pdf_factory):
     src = image_pdf_factory([f"CLABE {CLABE}"])

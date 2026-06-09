@@ -110,7 +110,10 @@ def scan(path: Path, pages=None, *, categories, names) -> OcrFindings:
         if pages is None:
             pages = range(1, doc.page_count + 1)
         for page_number in pages:
-            image = imaging.render_page(doc[page_number - 1], dpi=DPI)
+            page = doc[page_number - 1]
+            if not needs_ocr(page):
+                continue  # real text layer — the text-layer redactor handles it
+            image = imaging.render_page(page, dpi=DPI)
             words = _ocr_words(image)
             if not words:
                 continue
