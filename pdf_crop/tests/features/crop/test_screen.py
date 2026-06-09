@@ -1,7 +1,9 @@
+import fitz
 import pytest
 
 from pdf_crop.app import PdfCropApp
 from pdf_crop.features.crop.screen import CropScreen
+import zbar_skip
 
 
 def test_screen_default_strip_metadata_false(three_page_pdf):
@@ -53,3 +55,41 @@ async def test_scan_no_matches_keeps_apply_disabled(text_pdf_factory):
         await pilot.pause()
         assert screen.query_one("#apply_redaction_chk").disabled is True
         assert "nothing to redact" in str(screen.query_one("#preview_msg").content)
+
+
+@zbar_skip.SKIP
+async def test_scan_lists_found_qr_codes(qr_pdf_factory):
+    src = qr_pdf_factory(["CLABE002010077777777771"])
+    app = PdfCropApp(src)
+    async with app.run_test(size=(120, 60)) as pilot:
+        screen = app.screen
+        screen.query_one("#range_input").value = "1"
+        screen.query_one("#redact_qr_chk").value = True
+        await pilot.pause()
+        await pilot.click("#scan_btn")
+        await pilot.pause()
+        preview = str(screen.query_one("#preview_msg").content)
+        # The decoded payload is exposed so the user can verify it's their data.
+        assert "CLABE002010077777777771" in preview
+
+
+@zbar_skip.SKIP
+async def test_crop_with_redact_qr_removes_qr_from_output(qr_pdf_factory):
+    from PIL import Image
+    from pyzbar.pyzbar import decode
+
+    src = qr_pdf_factory(["CLABE002010077777777771"])
+    app = PdfCropApp(src)
+    async with app.run_test(size=(120, 60)) as pilot:
+        screen = app.screen
+        screen.query_one("#range_input").value = "1"
+        screen.query_one("#redact_qr_chk").value = True
+        await pilot.pause()
+        await pilot.click("#crop_btn")
+        await pilot.pause()
+
+    out = next(p for p in src.parent.glob("*_cropped*.pdf"))
+    doc = fitz.open(str(out))
+    pix = doc[0].get_pixmap(dpi=200)
+    img = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
+    assert decode(img) == []

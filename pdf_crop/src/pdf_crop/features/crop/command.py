@@ -36,18 +36,19 @@ def run(
     return 0
 
 
-def _redact_qr_in_place(dest: Path) -> None:
+def _redact_qr_in_place(dest: Path) -> int:
     """Second pass: scan the written PDF for QR/barcodes and redact them all.
 
     PyMuPDF can't garbage-collect a save back over the source, so redact into a
-    sibling temp file and atomically replace `dest`.
+    sibling temp file and atomically replace `dest`. Returns the number removed.
     """
     from pdf_crop.features.qr_redact import service as qr_service
 
     total = pdf_io.page_count(pdf_io.open_pdf(dest))
     findings = qr_service.scan(dest, list(range(1, total + 1)))
     if not findings.codes:
-        return
+        return 0
     tmp = dest.with_name(f"{dest.stem}.qr-tmp.pdf")
     qr_service.redact(dest, tmp, findings)
     os.replace(tmp, dest)
+    return len(findings.codes)
