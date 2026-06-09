@@ -11,7 +11,7 @@ Two slash commands wrap the loop: **`/task-init`** (front half) and **`/task-imp
 3. **Dispatch a subagent** to implement inside that worktree, following TDD. Multiple issues → `superpowers:dispatching-parallel-agents`, one agent per worktree, in a single message.
 4. **Run `superpowers:requesting-code-review`** on each branch.
 5. **Report findings, ask before fixing** (per the user's global rule).
-6. **Open a PR** (when asked) if no Important+ findings remain, then set the Plane issue to **Done**.
+6. **Open a PR automatically** once the branch is verified, green, committed, and clean (no Important+ findings remain), then set the Plane issue to **Done**. Only the fix decision in step 5 waits for the user.
 
 ## Why worktrees
 

@@ -107,8 +107,8 @@ This is the core. **Never write production code without a failing test first.**
    cd pdf_crop && uv run pytest
    ```
 
-Repeat per behavior. Commit at green points (only when the user asks to commit),
-using conventional-commit messages.
+Repeat per behavior. Commit at green points using conventional-commit messages —
+the back half (verify → review → PR) needs the work committed and the tree clean.
 
 ### Test conventions (from `pdf_crop`)
 
@@ -144,11 +144,15 @@ Run `superpowers:requesting-code-review` on the branch before any PR.
   Minor).
 - **Do not auto-fix.** The user decides scope. Re-review after agreed fixes.
 
-## 8. PR & close out
+## 8. PR & close out — automatic
 
-Open a PR only when no Important+ findings remain and the suite is green — and
-only when the user asks. Conventional-commit title with scope
+Open a PR **automatically** as soon as a branch is **verified, green, committed,
+and clean**: no Important+ findings outstanding, the full suite passing, and the
+working tree clean. No need to ask first. Conventional-commit title with scope
 (`feat(pdf_crop): …`). One feature per PR. Then set the Plane issue to **Done**.
+
+Only the PR-open step is automatic — the review *fix* decision still waits for
+the user (§7).
 
 ---
 
@@ -178,7 +182,9 @@ sequence them instead.
 - **Always superpowers.** Use the named skill at each stage; don't improvise the
   workflow.
 - **Worktrees always.** Implementation never happens in the main checkout.
-- **Branch off `main`; never commit to `main`.** Commit/push/PR only when asked.
+- **Branch off `main`; never commit to `main`.** Commit at green points; open
+  the PR **automatically** once the branch is verified, green, committed, and
+  clean (§8). The review fix decision still waits for the user.
 - **Conventional commits always.** `<type>(<scope>): <subject>`; scope is the
   sub-project. No `Co-Authored-By: Claude` trailer; no "Generated with Claude
   Code" footer.

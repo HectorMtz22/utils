@@ -56,17 +56,24 @@ Requested issues (may be empty): **$ARGUMENTS**
    Minor) and ask which to fix — do NOT auto-fix.** Apply only what the user
    approves, then re-review.
 
-7. **PR + close out.** Once a branch has no Important+ findings and the suite is
-   green, and **after the user asks to open it**:
-   - Open a PR with a conventional-commit title (`<type>(<scope>): …`), one
-     feature per PR. Commits drop the `Co-Authored-By: Claude` trailer; PR body
-     has no "Generated with Claude Code" footer.
+7. **PR + close out — automatic.** As soon as a branch is **verified, green,
+   committed, and clean** (no Important+ findings outstanding, full suite
+   passing, working tree clean), **open its PR without waiting to be asked**:
+   - Push the branch and open a PR with a conventional-commit title
+     (`<type>(<scope>): …`), one feature per PR. Commits drop the
+     `Co-Authored-By: Claude` trailer; PR body has no "Generated with Claude
+     Code" footer.
    - Set the Plane issue to **Done** with `mcp__plane__update_work_item`.
+   - The auto-open gate is the *only* thing that's hands-off: you still
+     **report review findings and wait for the user to choose fixes** (step 6)
+     before a branch counts as verified.
 
 ## Guardrails
 
-- **Branch off `main`; never commit to `main`.** Commit/push/PR only when the
-  user asks.
+- **Branch off `main`; never commit to `main`.** Commit at green points so the
+  branch is PR-ready, then **open the PR automatically** once it's verified,
+  green, committed, and clean (step 7) — no need to ask. (Fix decisions in
+  step 6 still wait for the user.)
 - **Worktrees always** — implementation never happens in the main checkout.
 - `.worktrees/` and `docs/superpowers/` are gitignored; never `git add` them.
 - Keep parallel agents on disjoint files; sequence anything that overlaps.

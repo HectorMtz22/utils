@@ -64,9 +64,11 @@ cd thermal-qr && ./tests/run.sh                             # test
 - **Commits:** Conventional Commits, scoped per project:
   `feat(pdf_crop): …`, `fix(thermal-qr): …`, `test(pdf_crop): …`,
   `chore: …`. One project per commit where possible.
-- **PRs:** one feature per PR; open only after code review is clean (see harness).
-- **Commit/push only when asked.** Branch off `main` first — never commit to
-  `main` directly.
+- **PRs:** one feature per PR; **opened automatically** once the branch is
+  verified, green, committed, and clean (see harness). Code-review *fixes* still
+  wait for the user.
+- **Branch off `main` first — never commit to `main` directly.** Commit at green
+  points so the branch is PR-ready.
 - **No Claude attribution.** Don't add `Co-Authored-By: Claude …` to commit
   messages or `🤖 Generated with Claude Code` to PR bodies.
 
