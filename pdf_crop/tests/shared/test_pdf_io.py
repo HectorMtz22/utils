@@ -96,3 +96,24 @@ def test_build_subset_selects_correct_pages_in_order(ten_page_pdf):
     writer = build_subset(reader, [4, 1])
     extracted = [p.extract_text().strip() for p in writer.pages]
     assert extracted == ["Page 4", "Page 1"]
+
+
+def test_build_subset_sanitize_empties_inventory(pdf_with_metadata):
+    from pdf_crop.shared.pdf_io import build_subset, open_pdf
+    from pdf_crop.features.sanitize.service import inventory
+
+    reader = open_pdf(pdf_with_metadata)
+    writer = build_subset(reader, [1], sanitize=True)
+    assert inventory(writer).total() == 0
+
+
+def test_write_subset_sanitize_strips_everything_and_keeps_text(pdf_with_metadata, tmp_path):
+    from pdf_crop.shared.pdf_io import write_subset, open_pdf
+    from pdf_crop.features.sanitize.service import inventory
+
+    dest = tmp_path / "subset.pdf"
+    write_subset(open_pdf(pdf_with_metadata), [1], dest, sanitize=True)
+
+    out = open_pdf(dest)
+    assert inventory(out).total() == 0
+    assert "Page 1" in out.pages[0].extract_text()
