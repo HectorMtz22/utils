@@ -1,3 +1,4 @@
+import io
 from pathlib import Path
 
 import pytest
@@ -59,6 +60,32 @@ def text_pdf_factory(tmp_path):
             c.showPage()
         c.save()
         return path
+    return _factory
+
+
+@pytest.fixture
+def qr_pdf_factory(tmp_path):
+    """PDF with one QR code per page. qr_pdf_factory(["payload a", ...]) -> Path.
+
+    Each QR is rendered with segno and embedded at a fixed rect via PyMuPDF, so
+    the document has a real image layer (not a text layer) for the qr_redact
+    feature to find.
+    """
+    import fitz
+    import segno
+
+    def _factory(payloads):
+        doc = fitz.open()
+        for payload in payloads:
+            buf = io.BytesIO()
+            segno.make(payload, error="h").save(buf, kind="png", scale=10, border=4)
+            page = doc.new_page(width=595, height=842)  # A4
+            page.insert_image(fitz.Rect(100, 100, 250, 250), stream=buf.getvalue())
+        path = tmp_path / "qr.pdf"
+        doc.save(str(path))
+        doc.close()
+        return path
+
     return _factory
 
 
