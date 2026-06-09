@@ -88,7 +88,7 @@ wrapped by two commands: **`/task-init`** (brainstorm → spec → file issues) 
 - **Issues live in Plane** — project **Utils** (`UTILS`). Each issue gets a
   project label (`pdf_crop`/`music-lyrics`/`thermal-qr`/`pxe-boot`) and a type
   label (`feat`/`fix`/`refactor`/`test`/`docs`/`chore`); states go
-  `Todo → In Progress → Done`. Not in local files.
+  `Todo → In Progress → In Review (PR open) → Done (merged)`. Not in local files.
 - **Always use worktrees** under `.worktrees/` (gitignored) for implementation;
   never work in the main checkout. Multiple issues run as parallel agents, one
   worktree each.

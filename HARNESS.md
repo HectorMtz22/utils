@@ -149,7 +149,8 @@ Run `superpowers:requesting-code-review` on the branch before any PR.
 Open a PR **automatically** as soon as a branch is **verified, green, committed,
 and clean**: no Important+ findings outstanding, the full suite passing, and the
 working tree clean. No need to ask first. Conventional-commit title with scope
-(`feat(pdf_crop): …`). One feature per PR. Then set the Plane issue to **Done**.
+(`feat(pdf_crop): …`). One feature per PR. Then move the Plane issue to
+**In Review**; set it to **Done** when the PR merges.
 
 Only the PR-open step is automatic — the review *fix* decision still waits for
 the user (§7).
@@ -168,7 +169,8 @@ For work that splits cleanly, `/task-implement` runs issues concurrently:
    worktree path, a "don't touch the main checkout or other worktrees"
    instruction, the code map, and a "report back briefly" instruction.
 4. The parent verifies each diff + test run, then reviews and PRs them
-   independently, marking each Plane issue `Done`.
+   independently, moving each Plane issue to `In Review` on PR-open (and to
+   `Done` when it merges).
 
 Keep agents on **disjoint files** — if two issues touch the same module,
 sequence them instead.

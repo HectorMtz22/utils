@@ -17,7 +17,7 @@ Requested issues (may be empty): **$ARGUMENTS**
 - Project **Utils**, identifier `UTILS`, `project_id`
   `43bbc122-c9fe-469e-9379-db02d132a5c9`.
 - Resolve states **by name at runtime** via `mcp__plane__list_states`:
-  **"Todo"**, **"In Progress"**, **"Done"**.
+  **"Todo"**, **"In Progress"**, **"In Review"**, **"Done"**.
 
 ## Steps
 
@@ -63,7 +63,8 @@ Requested issues (may be empty): **$ARGUMENTS**
      (`<type>(<scope>): …`), one feature per PR. Commits drop the
      `Co-Authored-By: Claude` trailer; PR body has no "Generated with Claude
      Code" footer.
-   - Set the Plane issue to **Done** with `mcp__plane__update_work_item`.
+   - Move the Plane issue to **In Review** (the PR is open, not merged) with
+     `mcp__plane__update_work_item`; set it to **Done** when the PR merges.
    - The auto-open gate is the *only* thing that's hands-off: you still
      **report review findings and wait for the user to choose fixes** (step 6)
      before a branch counts as verified.
