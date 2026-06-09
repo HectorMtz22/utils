@@ -178,6 +178,7 @@ async def test_crop_shows_error_on_ocr_second_pass_failure(text_pdf_factory, mon
         screen = app.screen
         screen.query_one("#range_input").value = "1"
         screen.query_one("#ocr_chk").value = True
+        screen.query_one("#cat_clabe_chk").value = True  # a category so OCR runs
         await pilot.pause()
         await pilot.click("#crop_btn")
         await pilot.pause()
