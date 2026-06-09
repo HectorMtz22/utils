@@ -56,18 +56,36 @@ def _has_trailer_id(pdf) -> bool:
     return "/ID" in pdf.trailer  # PdfReader
 
 
+def _name_tree_count(node, seen: set[int]) -> int:
+    """Entries in a PDF name tree, walking /Kids into leaves with /Names.
+
+    Large trees use intermediate /Kids nodes instead of a single /Names leaf;
+    `seen` (object ids) guards against cyclic/self-referential /Kids.
+    """
+    node = node.get_object()
+    if id(node) in seen:
+        return 0
+    seen.add(id(node))
+
+    entries = node.get("/Names")
+    if entries is not None:
+        return len(entries) // 2
+
+    kids = node.get("/Kids")
+    if kids is None:
+        return 0
+    return sum(_name_tree_count(kid, seen) for kid in kids)
+
+
 def _names_subtree_count(root, key: str) -> int:
-    """Number of entries under /Names/<key> (an alternating name/value array)."""
+    """Number of entries under /Names/<key>, descending /Kids nodes."""
     names = root.get("/Names")
     if names is None:
         return 0
     subtree = names.get_object().get(key)
     if subtree is None:
         return 0
-    entries = subtree.get_object().get("/Names")
-    if entries is None:
-        return 0
-    return len(entries) // 2
+    return _name_tree_count(subtree, set())
 
 
 def inventory(pdf) -> Inventory:

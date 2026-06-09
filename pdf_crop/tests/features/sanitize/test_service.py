@@ -1,6 +1,46 @@
 from pypdf import PdfReader, PdfWriter
+from pypdf.generic import (
+    ArrayObject,
+    DictionaryObject,
+    NameObject,
+    create_string_object,
+)
 
 from pdf_crop.features.sanitize import service as sanitize_service
+
+
+def _embedded_files_via_kids(writer):
+    """Attach a /Names /EmbeddedFiles name tree that uses intermediate /Kids
+    nodes (no top-level /Names leaf), as pypdf/Acrobat produce for large trees.
+
+    Returns the total number of file entries across the leaves.
+    """
+    root = writer._root_object
+
+    def _leaf(name: str) -> DictionaryObject:
+        return DictionaryObject({
+            NameObject("/Names"): ArrayObject(
+                [create_string_object(name), DictionaryObject()]
+            )
+        })
+
+    leaf_a = writer._add_object(_leaf("a.txt"))
+    leaf_b = writer._add_object(_leaf("b.txt"))
+    leaf_c = writer._add_object(_leaf("c.txt"))
+
+    # An intermediate /Kids node nested under the top-level /Kids node, so the
+    # tree is two levels deep.
+    nested = writer._add_object(
+        DictionaryObject({NameObject("/Kids"): ArrayObject([leaf_b, leaf_c])})
+    )
+    embedded = writer._add_object(
+        DictionaryObject({NameObject("/Kids"): ArrayObject([leaf_a, nested])})
+    )
+    names = writer._add_object(
+        DictionaryObject({NameObject("/EmbeddedFiles"): embedded})
+    )
+    root[NameObject("/Names")] = names
+    return 3
 
 
 def test_inventory_lists_all_sources(pdf_with_metadata):
@@ -57,6 +97,21 @@ def test_sanitize_removes_all_sources(pdf_with_metadata):
     assert inv.javascript is False
     assert inv.outlines is False
     assert inv.named_dests == 0
+
+
+def test_inventory_counts_nested_kids_name_tree(three_page_pdf):
+    """Name trees that use intermediate /Kids nodes (no top-level /Names leaf)
+    must still be counted, so the proof-of-scrub doesn't read 0 -> 0."""
+    reader = PdfReader(str(three_page_pdf))
+    writer = PdfWriter(clone_from=reader)
+    expected = _embedded_files_via_kids(writer)
+
+    inv = sanitize_service.inventory(writer)
+    assert inv.embedded_files == expected
+
+    # And sanitize still removes the whole tree.
+    sanitize_service.sanitize(writer)
+    assert sanitize_service.inventory(writer).embedded_files == 0
 
 
 def test_sanitize_preserves_text_layer(pdf_with_metadata, tmp_path):
