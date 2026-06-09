@@ -103,3 +103,13 @@ def test_run_with_redact_qr_returns_2_on_second_pass_error(ten_page_pdf, monkeyp
     rc = run(ten_page_pdf, "1-3", redact_qr=True)
     assert rc == 2
     assert "error:" in capsys.readouterr().err
+
+
+def test_run_passes_sanitize_through(pdf_with_metadata, capsys):
+    from pdf_crop.features.sanitize.service import inventory
+
+    rc = run(pdf_with_metadata, "1", sanitize=True)
+    assert rc == 0
+
+    expected = pdf_with_metadata.with_name("with_metadata_xmp_cropped.pdf")
+    assert inventory(open_pdf(expected)).total() == 0

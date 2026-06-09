@@ -8,6 +8,7 @@ from textual.widgets import Button, Checkbox, Footer, Header, Input, Static
 from pdf_crop.features.crop import command
 from pdf_crop.features.redact import service as redact_service
 from pdf_crop.features.redact import text_layer
+from pdf_crop.features.sanitize import service as sanitize_service
 from pdf_crop.shared import output_path, pdf_io, ranges
 from pdf_crop.shared.errors import PdfCropError
 
@@ -19,12 +20,12 @@ def _join_lines(*lines):
 class CropScreen(Screen):
     """Single-screen page picker."""
 
-    def __init__(self, src: Path, *, strip_metadata: bool = False) -> None:
+    def __init__(self, src: Path, *, sanitize: bool = False) -> None:
         super().__init__()
         self.src = src
         self.reader = pdf_io.open_pdf(src)
         self.total = pdf_io.page_count(self.reader)
-        self._strip_metadata_default = strip_metadata
+        self._sanitize_default = sanitize
         self._findings = None
 
     def compose(self) -> ComposeResult:
@@ -42,7 +43,13 @@ class CropScreen(Screen):
             Static("", id="preview_msg"),
             Checkbox("Apply redaction", id="apply_redaction_chk", disabled=True),
             Checkbox("Redact QR/barcodes", id="redact_qr_chk"),
-            Checkbox("Remove metadata", value=self._strip_metadata_default, id="strip_metadata_chk"),
+            Button("List metadata", id="list_metadata_btn"),
+            Static("", id="metadata_msg"),
+            Checkbox(
+                "Rebuild clean (strip all non-essential)",
+                value=self._sanitize_default,
+                id="sanitize_chk",
+            ),
             Static("", id="error_msg"),
             Static("", id="result_msg"),
             Button("Crop", id="crop_btn", variant="primary"),
@@ -119,6 +126,17 @@ class CropScreen(Screen):
             self.app.exit(0)
             return
 
+        if event.button.id == "list_metadata_btn":
+            inv = sanitize_service.inventory(self.reader)
+            summary = inv.summary()
+            metadata_msg = self.query_one("#metadata_msg", Static)
+            if not summary:
+                metadata_msg.update("Metadata: nothing found.")
+                return
+            parts = ", ".join(f"{v} {k}" for k, v in summary.items())
+            metadata_msg.update(f"Metadata: {parts} ({inv.total()} total)")
+            return
+
         if event.button.id == "scan_btn":
             error_msg = self.query_one("#error_msg", Static)
             preview = self.query_one("#preview_msg", Static)
@@ -155,12 +173,12 @@ class CropScreen(Screen):
             input_widget = self.query_one("#range_input", Input)
             error_msg = self.query_one("#error_msg", Static)
             result_msg = self.query_one("#result_msg", Static)
-            strip = self.query_one("#strip_metadata_chk", Checkbox).value
+            sanitize = self.query_one("#sanitize_chk", Checkbox).value
             apply_redaction = self.query_one("#apply_redaction_chk", Checkbox).value
             try:
                 pages = ranges.parse(input_widget.value, self.total)
                 dest = output_path.resolve(self.src)
-                writer = pdf_io.build_subset(self.reader, pages, strip_metadata=strip)
+                writer = pdf_io.build_subset(self.reader, pages, sanitize=sanitize)
                 redacted = 0
                 if apply_redaction and self._findings is not None:
                     redacted = redact_service.redact(

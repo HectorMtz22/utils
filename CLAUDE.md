@@ -64,9 +64,11 @@ cd thermal-qr && ./tests/run.sh                             # test
 - **Commits:** Conventional Commits, scoped per project:
   `feat(pdf_crop): …`, `fix(thermal-qr): …`, `test(pdf_crop): …`,
   `chore: …`. One project per commit where possible.
-- **PRs:** one feature per PR; open only after code review is clean (see harness).
-- **Commit/push only when asked.** Branch off `main` first — never commit to
-  `main` directly.
+- **PRs:** one feature per PR; **opened automatically** once the branch is
+  verified, green, committed, and clean (see harness). Code-review *fixes* still
+  wait for the user.
+- **Branch off `main` first — never commit to `main` directly.** Commit at green
+  points so the branch is PR-ready.
 - **No Claude attribution.** Don't add `Co-Authored-By: Claude …` to commit
   messages or `🤖 Generated with Claude Code` to PR bodies.
 
@@ -86,7 +88,7 @@ wrapped by two commands: **`/task-init`** (brainstorm → spec → file issues) 
 - **Issues live in Plane** — project **Utils** (`UTILS`). Each issue gets a
   project label (`pdf_crop`/`music-lyrics`/`thermal-qr`/`pxe-boot`) and a type
   label (`feat`/`fix`/`refactor`/`test`/`docs`/`chore`); states go
-  `Todo → In Progress → Done`. Not in local files.
+  `Todo → In Progress → In Review (PR open) → Done (merged)`. Not in local files.
 - **Always use worktrees** under `.worktrees/` (gitignored) for implementation;
   never work in the main checkout. Multiple issues run as parallel agents, one
   worktree each.
