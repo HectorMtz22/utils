@@ -80,6 +80,9 @@ def _redact_ocr_in_place(dest: Path, *, categories, names) -> int:
     replace `dest` (PyMuPDF can't garbage-collect a save back over the source).
     Returns the number of matches removed.
     """
+    if categories <= {"name"} and not names:
+        return 0  # nothing OCR can detect → skip the costly render/OCR pass
+
     from pdf_crop.features.ocr_redact import service as ocr_service
 
     try:

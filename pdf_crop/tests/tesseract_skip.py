@@ -11,12 +11,16 @@ import pytest
 
 try:
     import pytesseract
-
-    pytesseract.get_tesseract_version()  # raises if the binary is missing
-    TESSERACT_AVAILABLE = True
-    _REASON = ""
-except Exception as e:  # pragma: no cover - env-dependent
+except ImportError as e:  # pragma: no cover - env-dependent
     TESSERACT_AVAILABLE = False
-    _REASON = f"tesseract binary unavailable: {e}"
+    _REASON = f"pytesseract not installed: {e}"
+else:
+    try:
+        pytesseract.get_tesseract_version()  # raises if the binary is missing
+        TESSERACT_AVAILABLE = True
+        _REASON = ""
+    except pytesseract.TesseractNotFoundError as e:  # pragma: no cover - env-dependent
+        TESSERACT_AVAILABLE = False
+        _REASON = f"tesseract binary unavailable: {e}"
 
 SKIP = pytest.mark.skipif(not TESSERACT_AVAILABLE, reason=_REASON)

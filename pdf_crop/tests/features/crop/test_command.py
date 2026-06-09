@@ -163,6 +163,19 @@ def test_run_with_ocr_returns_2_on_second_pass_error(ten_page_pdf, monkeypatch, 
     assert "error:" in capsys.readouterr().err
 
 
+def test_redact_ocr_skips_when_no_effective_category(ten_page_pdf, monkeypatch):
+    """OCR pass is skipped (no render/OCR, no avoidable error) when nothing can
+    be detected: empty categories, or only `name` with no names. scan() must not
+    even be called."""
+    def fail(*a, **k):
+        raise AssertionError("OCR scan must not run when no category can match")
+
+    monkeypatch.setattr(ocr_service, "scan", fail)
+
+    assert _redact_ocr_in_place(ten_page_pdf, categories=set(), names=[]) == 0
+    assert _redact_ocr_in_place(ten_page_pdf, categories={"name"}, names=[]) == 0
+
+
 def test_run_passes_sanitize_through(pdf_with_metadata, capsys):
     from pdf_crop.features.sanitize.service import inventory
 
