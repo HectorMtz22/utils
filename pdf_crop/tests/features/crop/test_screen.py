@@ -130,6 +130,29 @@ async def test_crop_shows_error_on_qr_second_pass_failure(text_pdf_factory, monk
         assert "QR" in error or "redaction failed" in error
 
 
+async def test_scan_shows_error_on_qr_preview_failure(text_pdf_factory, monkeypatch):
+    # A decode/imaging failure while scanning QR for the preview must surface as
+    # the red error message, not crash the TUI.
+    from pdf_crop.features.qr_redact import service as qr_service
+
+    def boom(*a, **k):
+        raise ValueError("pyzbar decode failure")
+
+    monkeypatch.setattr(qr_service, "scan", boom)
+
+    src = text_pdf_factory(["no real qr here, scan is faked"])
+    app = PdfCropApp(src)
+    async with app.run_test(size=(120, 60)) as pilot:
+        screen = app.screen
+        screen.query_one("#range_input").value = "1"
+        screen.query_one("#redact_qr_chk").value = True
+        await pilot.pause()
+        await pilot.click("#scan_btn")
+        await pilot.pause()
+        error = str(screen.query_one("#error_msg").content)
+        assert "QR" in error or "scan failed" in error
+
+
 @zbar_skip.SKIP
 async def test_crop_with_redact_qr_removes_qr_from_output(qr_pdf_factory):
     from PIL import Image

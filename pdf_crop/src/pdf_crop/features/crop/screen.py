@@ -10,7 +10,7 @@ from pdf_crop.features.redact import service as redact_service
 from pdf_crop.features.redact import text_layer
 from pdf_crop.features.sanitize import service as sanitize_service
 from pdf_crop.shared import output_path, pdf_io, ranges
-from pdf_crop.shared.errors import PdfCropError
+from pdf_crop.shared.errors import PdfCropError, QrRedactionFailed
 
 
 def _join_lines(*lines):
@@ -74,15 +74,21 @@ class CropScreen(Screen):
         return [n.strip() for n in raw.split(",") if n.strip()]
 
     def _qr_preview_line(self, pages):
-        """Scan for QR/barcodes (if requested) and return a preview line + findings.
+        """Scan for QR/barcodes (if requested) and return a preview line (a str).
 
         Returns "" when the QR option is off. Exposes each decoded payload so the
-        user can verify it's really their data before exporting.
+        user can verify it's really their data before exporting. A render/decode
+        failure is translated to a PdfCropError so the caller can show it.
         """
         if not self.query_one("#redact_qr_chk", Checkbox).value:
             return ""
-        from pdf_crop.features.qr_redact import service as qr_service
-        findings = qr_service.scan(self.src, pages)
+        try:
+            from pdf_crop.features.qr_redact import service as qr_service
+            findings = qr_service.scan(self.src, pages)
+        except PdfCropError:
+            raise
+        except Exception as e:  # zbar missing / fitz render / decode failure
+            raise QrRedactionFailed(f"QR/barcode scan failed: {e}") from e
         if not findings.codes:
             return "QR/barcodes: none found."
         items = ", ".join(f"{c.symbology} {c.payload!r}" for c in findings.codes)
@@ -145,7 +151,11 @@ class CropScreen(Screen):
             except PdfCropError as e:
                 error_msg.update(f"[red]{e}[/red]")
                 return
-            qr_line = self._qr_preview_line(pages)
+            try:
+                qr_line = self._qr_preview_line(pages)
+            except PdfCropError as e:
+                error_msg.update(f"[red]{e}[/red]")
+                return
             cats = self._selected_categories()
             if not cats:
                 preview.update(qr_line or "Select at least one category to scan.")
