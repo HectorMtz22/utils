@@ -130,6 +130,62 @@ async def test_crop_shows_error_on_qr_second_pass_failure(text_pdf_factory, monk
         assert "QR" in error or "redaction failed" in error
 
 
+async def test_crop_runs_ocr_second_pass_with_selected_categories(text_pdf_factory, monkeypatch):
+    # When #ocr_chk is ticked, the OCR second pass runs over the written file
+    # using the selected category checkboxes + names input.
+    from pdf_crop.features.crop import command
+
+    calls = {}
+
+    def fake_ocr(dest, *, categories, names):
+        calls["dest"] = dest
+        calls["categories"] = categories
+        calls["names"] = names
+        return 0
+
+    monkeypatch.setattr(command, "_redact_ocr_in_place", fake_ocr)
+
+    src = text_pdf_factory(["some text"])
+    app = PdfCropApp(src)
+    async with app.run_test(size=(120, 60)) as pilot:
+        screen = app.screen
+        screen.query_one("#range_input").value = "1"
+        screen.query_one("#ocr_chk").value = True
+        screen.query_one("#cat_clabe_chk").value = True
+        screen.query_one("#names_input").value = "Jane Doe"
+        screen.query_one("#cat_name_chk").value = True
+        await pilot.pause()
+        await pilot.click("#crop_btn")
+        await pilot.pause()
+
+    assert calls["categories"] == {"clabe", "name"}
+    assert calls["names"] == ["Jane Doe"]
+
+
+async def test_crop_shows_error_on_ocr_second_pass_failure(text_pdf_factory, monkeypatch):
+    # An OCR/tesseract failure in the second pass must surface as the red error
+    # message (translated to PdfCropError), not an uncaught traceback.
+    from pdf_crop.features.ocr_redact import service as ocr_service
+
+    def boom(*a, **k):
+        raise ValueError("tesseract failure")
+
+    monkeypatch.setattr(ocr_service, "scan", boom)
+
+    src = text_pdf_factory(["no ocr here, scan is faked"])
+    app = PdfCropApp(src)
+    async with app.run_test(size=(120, 60)) as pilot:
+        screen = app.screen
+        screen.query_one("#range_input").value = "1"
+        screen.query_one("#ocr_chk").value = True
+        screen.query_one("#cat_clabe_chk").value = True  # a category so OCR runs
+        await pilot.pause()
+        await pilot.click("#crop_btn")
+        await pilot.pause()
+        error = str(screen.query_one("#error_msg").content)
+        assert "OCR" in error or "redaction failed" in error
+
+
 async def test_scan_shows_error_on_qr_preview_failure(text_pdf_factory, monkeypatch):
     # A decode/imaging failure while scanning QR for the preview must surface as
     # the red error message, not crash the TUI.

@@ -53,6 +53,11 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Detect and remove QR codes / barcodes from the output PDF.",
     )
+    parser.add_argument(
+        "--ocr",
+        action="store_true",
+        help="OCR scanned/image-only pages and redact CLABE/card/RFC/CURP text.",
+    )
     args = parser.parse_args(argv)
 
     try:
@@ -74,4 +79,6 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     sanitize = args.sanitize or args.remove_metadata
-    return crop_run(args.file, args.range, sanitize=sanitize, redact_qr=args.redact_qr)
+    return crop_run(
+        args.file, args.range, sanitize=sanitize, redact_qr=args.redact_qr, ocr=args.ocr
+    )

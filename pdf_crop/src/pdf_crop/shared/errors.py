@@ -20,3 +20,7 @@ class SourceNotFound(PdfCropError):
 
 class QrRedactionFailed(PdfCropError):
     """The QR/barcode second pass failed (render, decode, or redact error)."""
+
+
+class OcrRedactionFailed(PdfCropError):
+    """The OCR second pass failed (render, OCR, or redact error)."""
