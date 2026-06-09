@@ -4,6 +4,8 @@ import sys
 
 from pdf_crop.shared.errors import NotAPdf, SourceNotFound
 from pdf_crop.features.crop.command import run as crop_run
+from pdf_crop.features.sanitize import service as sanitize_service
+from pdf_crop.shared import pdf_io
 
 PDF_MAGIC = b"%PDF"
 
@@ -32,9 +34,19 @@ def main(argv: list[str] | None = None) -> int:
         help='Page expression like "1-5,8,11-13". Omit to open the TUI.',
     )
     parser.add_argument(
+        "--list-metadata",
+        action="store_true",
+        help="Print an inventory of every metadata source and exit (no write).",
+    )
+    parser.add_argument(
+        "--sanitize",
+        action="store_true",
+        help="Rebuild clean: strip all non-essential metadata, keep the text.",
+    )
+    parser.add_argument(
         "--remove-metadata",
         action="store_true",
-        help="Strip /Info dictionary and XMP /Metadata from the output PDF.",
+        help="Deprecated alias of --sanitize.",
     )
     args = parser.parse_args(argv)
 
@@ -44,4 +56,17 @@ def main(argv: list[str] | None = None) -> int:
         print(f"error: {e}", file=sys.stderr)
         return 2
 
-    return crop_run(args.file, args.range, strip_metadata=args.remove_metadata)
+    if args.list_metadata:
+        reader = pdf_io.open_pdf(args.file)
+        inv = sanitize_service.inventory(reader)
+        summary = inv.summary()
+        if not summary:
+            print("No metadata found.")
+        else:
+            for source, count in summary.items():
+                print(f"{source}: {count}")
+            print(f"total: {inv.total()}")
+        return 0
+
+    sanitize = args.sanitize or args.remove_metadata
+    return crop_run(args.file, args.range, sanitize=sanitize)

@@ -38,3 +38,35 @@ def test_cli_remove_metadata_flag_strips_info(pdf_with_metadata, capsys):
     out = open_pdf(expected)
     assert not out.metadata
     assert "/Metadata" not in out.trailer["/Root"]
+
+
+def test_cli_list_metadata_prints_inventory(pdf_with_metadata, capsys):
+    rc = main([str(pdf_with_metadata), "--list-metadata"])
+    assert rc == 0
+
+    printed = capsys.readouterr().out
+    assert "info" in printed
+    assert "annotations" in printed
+    # --list-metadata must not write an output PDF.
+    assert not pdf_with_metadata.with_name("with_metadata_xmp_cropped.pdf").exists()
+
+
+def test_cli_sanitize_strips_everything(pdf_with_metadata, capsys):
+    from pdf_crop.features.sanitize.service import inventory
+
+    rc = main([str(pdf_with_metadata), "1", "--sanitize"])
+    assert rc == 0
+
+    out = open_pdf(pdf_with_metadata.with_name("with_metadata_xmp_cropped.pdf"))
+    assert inventory(out).total() == 0
+    assert "Page 1" in out.pages[0].extract_text()
+
+
+def test_cli_remove_metadata_alias_strips_everything(pdf_with_metadata, capsys):
+    from pdf_crop.features.sanitize.service import inventory
+
+    rc = main([str(pdf_with_metadata), "1", "--remove-metadata"])
+    assert rc == 0
+
+    out = open_pdf(pdf_with_metadata.with_name("with_metadata_xmp_cropped.pdf"))
+    assert inventory(out).total() == 0

@@ -42,3 +42,13 @@ def test_run_passes_strip_metadata_through(pdf_with_metadata, capsys):
     out = open_pdf(expected)
     assert not out.metadata
     assert "/Metadata" not in out.trailer["/Root"]
+
+
+def test_run_passes_sanitize_through(pdf_with_metadata, capsys):
+    from pdf_crop.features.sanitize.service import inventory
+
+    rc = run(pdf_with_metadata, "1", sanitize=True)
+    assert rc == 0
+
+    expected = pdf_with_metadata.with_name("with_metadata_xmp_cropped.pdf")
+    assert inventory(open_pdf(expected)).total() == 0

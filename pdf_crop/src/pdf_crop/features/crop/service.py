@@ -10,8 +10,8 @@ def crop_pdf(
     pages: list[int],
     dest: Path,
     *,
-    strip_metadata: bool = False,
+    sanitize: bool = False,
 ) -> Path:
     """Write `pages` (1-indexed) from `reader` into `dest`. Returns dest."""
-    pdf_io.write_subset(reader, pages, dest, strip_metadata=strip_metadata)
+    pdf_io.write_subset(reader, pages, dest, sanitize=sanitize)
     return dest
