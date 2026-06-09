@@ -36,6 +36,11 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Strip /Info dictionary and XMP /Metadata from the output PDF.",
     )
+    parser.add_argument(
+        "--redact-qr",
+        action="store_true",
+        help="Detect and remove QR codes / barcodes from the output PDF.",
+    )
     args = parser.parse_args(argv)
 
     try:
@@ -44,4 +49,9 @@ def main(argv: list[str] | None = None) -> int:
         print(f"error: {e}", file=sys.stderr)
         return 2
 
-    return crop_run(args.file, args.range, strip_metadata=args.remove_metadata)
+    return crop_run(
+        args.file,
+        args.range,
+        strip_metadata=args.remove_metadata,
+        redact_qr=args.redact_qr,
+    )

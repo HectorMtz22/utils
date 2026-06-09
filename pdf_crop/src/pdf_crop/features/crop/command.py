@@ -1,4 +1,5 @@
 from pathlib import Path
+import os
 import sys
 
 from pdf_crop.shared import ranges, pdf_io, output_path
@@ -12,6 +13,7 @@ def run(
     range_expr: str | None,
     *,
     strip_metadata: bool = False,
+    redact_qr: bool = False,
 ) -> int:
     """Crop entry point. If range_expr is None, launch the TUI; otherwise direct mode."""
     if range_expr is None:
@@ -24,9 +26,28 @@ def run(
         pages = ranges.parse(range_expr, total)
         dest = output_path.resolve(src)
         result = crop_pdf(reader, pages, dest, strip_metadata=strip_metadata)
+        if redact_qr:
+            _redact_qr_in_place(dest)
     except PdfCropError as e:
         print(f"error: {e}", file=sys.stderr)
         return 2
 
     print(result)
     return 0
+
+
+def _redact_qr_in_place(dest: Path) -> None:
+    """Second pass: scan the written PDF for QR/barcodes and redact them all.
+
+    PyMuPDF can't garbage-collect a save back over the source, so redact into a
+    sibling temp file and atomically replace `dest`.
+    """
+    from pdf_crop.features.qr_redact import service as qr_service
+
+    total = pdf_io.page_count(pdf_io.open_pdf(dest))
+    findings = qr_service.scan(dest, list(range(1, total + 1)))
+    if not findings.codes:
+        return
+    tmp = dest.with_name(f"{dest.stem}.qr-tmp.pdf")
+    qr_service.redact(dest, tmp, findings)
+    os.replace(tmp, dest)
