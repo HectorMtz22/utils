@@ -50,6 +50,50 @@ def test_cli_redact_qr_flag_removes_qr_from_output(qr_pdf_factory, capsys):
     assert decode(img) == []  # QR is gone from the rendered output
 
 
+def test_cli_ocr_flag_runs_second_pass(ten_page_pdf, monkeypatch, capsys):
+    """`--ocr` triggers the OCR second pass over the written output with the
+    automatic categories (no per-category flags in the CLI)."""
+    from pdf_crop.features.crop import command
+
+    calls = {}
+
+    def fake_ocr(dest, *, categories, names):
+        calls["categories"] = categories
+        calls["names"] = names
+        return 0
+
+    monkeypatch.setattr(command, "_redact_ocr_in_place", fake_ocr)
+
+    rc = main([str(ten_page_pdf), "1-2", "--ocr"])
+    assert rc == 0
+    assert calls["categories"] == {"clabe", "card", "rfc", "curp"}
+    assert calls["names"] == []
+
+
+def test_cli_ocr_flag_removes_clabe_from_image_pdf(image_pdf_factory):
+    """End-to-end: --ocr redacts a CLABE that only exists in the image layer."""
+    import pytest
+    import tesseract_skip
+
+    if not tesseract_skip.TESSERACT_AVAILABLE:
+        pytest.skip("tesseract binary unavailable")
+
+    import pytesseract
+    from pdf_crop.shared import imaging
+
+    clabe = "002010012345678903"
+    src = image_pdf_factory([f"CLABE {clabe}"])
+    rc = main([str(src), "1", "--ocr"])
+    assert rc == 0
+
+    out = src.with_name(f"{src.stem}_cropped.pdf")
+    assert out.exists()
+    doc = fitz.open(str(out))
+    img = imaging.render_page(doc[0], dpi=200)
+    doc.close()
+    assert clabe not in pytesseract.image_to_string(img).replace(" ", "")
+
+
 def test_cli_remove_metadata_flag_strips_info(pdf_with_metadata, capsys):
     rc = main([str(pdf_with_metadata), "1", "--remove-metadata"])
     assert rc == 0

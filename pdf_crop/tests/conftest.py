@@ -108,6 +108,38 @@ def qr_pdf_factory(tmp_path):
 
 
 @pytest.fixture
+def image_pdf_factory(tmp_path):
+    """PDF whose pages are rasterized text, with NO text layer.
+
+    image_pdf_factory(["line a", "line b"]) -> Path. Each line is drawn onto a
+    white PIL image with a large font and embedded as a full-page image via
+    PyMuPDF `insert_image`, so `extract_text()` finds nothing and only an OCR
+    pass can recover the text.
+    """
+    import fitz
+    from PIL import Image, ImageDraw, ImageFont
+
+    def _factory(lines):
+        doc = fitz.open()
+        # Pillow's bundled DejaVuSans (load_default) is portable across CI/dev.
+        font = ImageFont.load_default(size=64)
+        for line in lines:
+            img = Image.new("RGB", (1240, 1754), "white")  # ~150 dpi A4
+            draw = ImageDraw.Draw(img)
+            draw.text((100, 120), line, fill="black", font=font)
+            buf = io.BytesIO()
+            img.save(buf, format="PNG")
+            page = doc.new_page(width=595, height=842)  # A4 points
+            page.insert_image(page.rect, stream=buf.getvalue())
+        path = tmp_path / "image_only.pdf"
+        doc.save(str(path))
+        doc.close()
+        return path
+
+    return _factory
+
+
+@pytest.fixture
 def pdf_with_metadata(tmp_path) -> Path:
     src = tmp_path / "with_metadata.pdf"
     c = Canvas(str(src))

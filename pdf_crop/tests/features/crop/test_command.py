@@ -1,9 +1,12 @@
 import pytest
 
-from pdf_crop.features.crop.command import run, _redact_qr_in_place
+from pdf_crop.features.crop.command import run, _redact_qr_in_place, _redact_ocr_in_place
 from pdf_crop.features.qr_redact import service as qr_service
+from pdf_crop.features.ocr_redact import service as ocr_service
 from pdf_crop.shared.errors import PdfCropError
 from pdf_crop.shared.pdf_io import open_pdf, page_count
+
+CATS = {"clabe", "card", "rfc", "curp"}
 
 
 def test_direct_mode_writes_cropped_file(ten_page_pdf, capsys):
@@ -101,6 +104,61 @@ def test_run_with_redact_qr_returns_2_on_second_pass_error(ten_page_pdf, monkeyp
     )
 
     rc = run(ten_page_pdf, "1-3", redact_qr=True)
+    assert rc == 2
+    assert "error:" in capsys.readouterr().err
+
+
+def _one_ocr_finding(page=1):
+    """An OcrFindings with a single match so the redact path is reached."""
+    f = ocr_service.OcrFindings()
+    f.matches.append(
+        ocr_service.OcrMatch(page=page, category="clabe", text="x", rects=())
+    )
+    return f
+
+
+def test_redact_ocr_cleans_up_temp_on_redact_failure(ten_page_pdf, monkeypatch):
+    """If OCR redact raises after creating the temp file, no .ocr-tmp.pdf is left
+    and the source PDF is untouched."""
+    dest = ten_page_pdf
+    original = dest.read_bytes()
+    tmp = dest.with_name(f"{dest.stem}.ocr-tmp.pdf")
+
+    monkeypatch.setattr(ocr_service, "scan", lambda *a, **k: _one_ocr_finding())
+
+    def fake_redact(path, dest_path, findings):
+        dest_path.write_bytes(b"%PDF-1.4\npartial")  # temp gets created...
+        raise RuntimeError("boom")                   # ...then second pass fails
+
+    monkeypatch.setattr(ocr_service, "redact", fake_redact)
+
+    with pytest.raises(PdfCropError):
+        _redact_ocr_in_place(dest, categories=CATS, names=[])
+
+    assert not tmp.exists()
+    assert dest.read_bytes() == original
+
+
+def test_redact_ocr_translates_tesseract_error_to_pdfcroperror(ten_page_pdf, monkeypatch):
+    """A render/OCR error in the second pass surfaces as a PdfCropError."""
+    def boom(*a, **k):
+        raise ValueError("tesseract not found")
+
+    monkeypatch.setattr(ocr_service, "scan", boom)
+
+    with pytest.raises(PdfCropError):
+        _redact_ocr_in_place(ten_page_pdf, categories=CATS, names=[])
+
+
+def test_run_with_ocr_returns_2_on_second_pass_error(ten_page_pdf, monkeypatch, capsys):
+    """CLI run() exits rc 2 with 'error:' when the OCR second pass blows up."""
+    monkeypatch.setattr(ocr_service, "scan", lambda *a, **k: _one_ocr_finding())
+    monkeypatch.setattr(
+        ocr_service, "redact",
+        lambda *a, **k: (_ for _ in ()).throw(ValueError("ocr failure")),
+    )
+
+    rc = run(ten_page_pdf, "1-3", ocr=True)
     assert rc == 2
     assert "error:" in capsys.readouterr().err
 
