@@ -72,6 +72,35 @@ export DYLD_LIBRARY_PATH=/opt/homebrew/opt/zbar/lib   # Apple silicon
 The QR tests skip automatically when `zbar` isn't available, so the rest of the
 suite still runs on a machine without it.
 
+## OCR (scanned / image-only pages)
+
+Scanned statements have **no text layer**, so the text-layer detectors above
+find nothing. A separate OCR pass renders each page, reads it with `tesseract`
+(via `pytesseract`), reconstructs the page text while tracking every word's
+bounding box, runs the same CLABE / card / RFC / CURP detectors over that text,
+and applies a **true** PyMuPDF redaction over each matched word — the text is
+removed from the image, not just covered.
+
+```bash
+uv run pdfcrop Document.pdf 1-5 --ocr   # crop, then OCR-redact scanned pages
+```
+
+`--ocr` scans the automatic categories (CLABE, card, RFC, CURP). In the TUI,
+tick **OCR scan (for scanned pages)**: the second pass uses the category
+checkboxes you've selected plus the *names* field, so it can also redact names
+on scanned pages. Like the QR pass, this runs over the already-cropped output.
+
+### Native dependency: tesseract
+
+OCR needs the native `tesseract` engine (via `pytesseract`). On macOS:
+
+```bash
+brew install tesseract
+```
+
+The OCR tests skip automatically when the `tesseract` binary isn't on `PATH`,
+so the rest of the suite still runs on a machine without it.
+
 ## Develop
 
 ```bash

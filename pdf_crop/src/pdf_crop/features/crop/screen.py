@@ -10,7 +10,7 @@ from pdf_crop.features.redact import service as redact_service
 from pdf_crop.features.redact import text_layer
 from pdf_crop.features.sanitize import service as sanitize_service
 from pdf_crop.shared import output_path, pdf_io, ranges
-from pdf_crop.shared.errors import PdfCropError, QrRedactionFailed
+from pdf_crop.shared.errors import PdfCropError, QrRedactionFailed, OcrRedactionFailed
 
 
 def _join_lines(*lines):
@@ -43,6 +43,7 @@ class CropScreen(Screen):
             Static("", id="preview_msg"),
             Checkbox("Apply redaction", id="apply_redaction_chk", disabled=True),
             Checkbox("Redact QR/barcodes", id="redact_qr_chk"),
+            Checkbox("OCR scan (for scanned pages)", id="ocr_chk"),
             Button("List metadata", id="list_metadata_btn"),
             Static("", id="metadata_msg"),
             Checkbox(
@@ -201,6 +202,13 @@ class CropScreen(Screen):
                 qr_removed = 0
                 if self.query_one("#redact_qr_chk", Checkbox).value:
                     qr_removed = command._redact_qr_in_place(dest)
+                ocr_removed = 0
+                if self.query_one("#ocr_chk", Checkbox).value:
+                    ocr_removed = command._redact_ocr_in_place(
+                        dest,
+                        categories=self._selected_categories(),
+                        names=self._names(),
+                    )
             except PdfCropError as e:
                 error_msg.update(f"[red]{e}[/red]")
                 return
@@ -209,6 +217,8 @@ class CropScreen(Screen):
                 notes.append(f"redacted {redacted} items")
             if qr_removed:
                 notes.append(f"{qr_removed} QR/barcodes")
+            if ocr_removed:
+                notes.append(f"{ocr_removed} OCR items")
             suffix = f" ({', '.join(notes)})" if notes else ""
             result_msg.update(f"[green]Wrote {dest}{suffix}[/green]")
             self.app.exit(0)
