@@ -16,3 +16,7 @@ class NotAPdf(PdfCropError):
 
 class SourceNotFound(PdfCropError):
     """Source file does not exist."""
+
+
+class QrRedactionFailed(PdfCropError):
+    """The QR/barcode second pass failed (render, decode, or redact error)."""

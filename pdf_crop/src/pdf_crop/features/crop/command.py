@@ -3,7 +3,7 @@ import os
 import sys
 
 from pdf_crop.shared import ranges, pdf_io, output_path
-from pdf_crop.shared.errors import PdfCropError
+from pdf_crop.shared.errors import PdfCropError, QrRedactionFailed
 
 from .service import crop_pdf
 
@@ -44,11 +44,19 @@ def _redact_qr_in_place(dest: Path) -> int:
     """
     from pdf_crop.features.qr_redact import service as qr_service
 
-    total = pdf_io.page_count(pdf_io.open_pdf(dest))
-    findings = qr_service.scan(dest, list(range(1, total + 1)))
-    if not findings.codes:
-        return 0
-    tmp = dest.with_name(f"{dest.stem}.qr-tmp.pdf")
-    qr_service.redact(dest, tmp, findings)
-    os.replace(tmp, dest)
+    try:
+        total = pdf_io.page_count(pdf_io.open_pdf(dest))
+        findings = qr_service.scan(dest, list(range(1, total + 1)))
+        if not findings.codes:
+            return 0
+        tmp = dest.with_name(f"{dest.stem}.qr-tmp.pdf")
+        try:
+            qr_service.redact(dest, tmp, findings)
+            os.replace(tmp, dest)  # atomic on success; clobbers temp
+        finally:
+            tmp.unlink(missing_ok=True)  # no orphan if redact/replace raised
+    except PdfCropError:
+        raise
+    except Exception as e:  # fitz/pyzbar render or decode failure
+        raise QrRedactionFailed(f"QR/barcode redaction failed: {e}") from e
     return len(findings.codes)
