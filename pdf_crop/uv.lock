@@ -157,6 +157,7 @@ name = "pdf-crop"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "pillow" },
     { name = "pymupdf" },
     { name = "pypdf" },
     { name = "pyzbar" },
@@ -173,6 +174,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "pillow", specifier = ">=12.2.0" },
     { name = "pymupdf", specifier = ">=1.27.2.3" },
     { name = "pypdf", specifier = ">=5.0" },
     { name = "pyzbar", specifier = ">=0.1.9" },
