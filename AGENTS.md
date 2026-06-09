@@ -1,27 +1,38 @@
 # Agent workflow for this repo
 
-This file captures how feature work is done in this repo by automated coding agents (Claude Code with the `superpowers` plugin). It's a recipe, not a rule.
+This file captures how feature work is done in this repo by automated coding agents (Claude Code with the `superpowers` plugin and the **Plane** MCP server). It's a recipe, not a rule. **Always use superpowers** — invoke the named skill at each stage. See [`HARNESS.md`](HARNESS.md) for the full TDD detail.
+
+Two slash commands wrap the loop: **`/task-init`** (front half) and **`/task-implement`** (back half).
 
 ## TL;DR
 
-1. **Run `/superpowers:brainstorming`** to produce a design at `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md` (gitignored, local-only).
-2. **Create a worktree** under `.worktrees/<topic>/` on a new branch (gitignored).
-3. **Dispatch a subagent** to implement inside that worktree, following TDD.
-4. **Run `/superpowers:requesting-code-review`** on the branch.
+1. **`/task-init`** runs `superpowers:brainstorming` → a design at `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md` (gitignored, local-only) → files **Plane issue(s)** in the `UTILS` project (state `Todo`, project + type labels).
+2. **`/task-implement [UTILS-…]`** picks up the issue(s) and, for each, moves it to `In Progress` and **creates a worktree** under `.worktrees/<topic>/` on a new branch (gitignored) via `superpowers:using-git-worktrees`.
+3. **Dispatch a subagent** to implement inside that worktree, following TDD. Multiple issues → `superpowers:dispatching-parallel-agents`, one agent per worktree, in a single message.
+4. **Run `superpowers:requesting-code-review`** on each branch.
 5. **Report findings, ask before fixing** (per the user's global rule).
-6. **Open a PR** if no Important+ findings remain.
+6. **Open a PR** (when asked) if no Important+ findings remain, then set the Plane issue to **Done**.
 
 ## Why worktrees
 
 Subagents touch a lot of files. Doing implementation in a separate worktree on a feature branch keeps the main checkout clean and lets the parent agent inspect the diff without context pollution.
 
-When two or more independent tasks are dispatched in parallel, each gets its own worktree, branch, and PR, so the diffs never tangle.
+When two or more independent tasks are dispatched in parallel, each gets its own worktree, branch, and PR, so the diffs never tangle. Worktree setup goes through `superpowers:using-git-worktrees`; implementation **always** happens in a worktree, never in the main checkout.
 
 ```bash
-git worktree add -b feature/<topic> .worktrees/<topic> main
+git worktree add -b <type>/<scope>-<topic> .worktrees/<topic> main
 ```
 
 `.worktrees/` is gitignored.
+
+## Issue tracking — Plane
+
+Issues live in **Plane**, not in local files. Project **Utils** (identifier `UTILS`, `project_id 43bbc122-c9fe-469e-9379-db02d132a5c9`). `/task-init` files them; `/task-implement` reads and advances them.
+
+- **States:** `Todo` → `In Progress` → `Done` (resolve ids at runtime via `list_states`).
+- **Labels:** one **project** label (`pdf_crop`, `music-lyrics`, `thermal-qr`, `pxe-boot`) plus one **type** label (`feat`, `fix`, `refactor`, `test`, `docs`, `chore`) per issue (resolve via `list_labels`).
+- One issue ≈ one PR-sized chunk; independent issues enable parallel agents.
+- The issue description carries the problem/approach/code-map/test-list and a pointer to the local spec filename.
 
 ## Why a separate spec workspace
 
@@ -29,16 +40,16 @@ git worktree add -b feature/<topic> .worktrees/<topic> main
 
 ## Subagents
 
-For an implementation task that's bigger than a single edit, dispatch a `general-purpose` subagent with:
+For an implementation task that's bigger than a single edit, use `superpowers:subagent-driven-development` to dispatch a subagent with:
 
-- A pointer to the design doc.
-- The exact worktree path and a "do not touch the main checkout" instruction.
+- A pointer to its **Plane issue** and the linked design doc.
+- The exact worktree path and a "do not touch the main checkout or sibling worktrees" instruction.
 - An explicit code map (files to touch).
 - A "report back briefly" instruction (so the parent's context isn't flooded).
 
-When tasks run in parallel, dispatch one subagent per worktree.
+When tasks run in parallel, use `superpowers:dispatching-parallel-agents`: dispatch one subagent per worktree in a single message. Keep them on disjoint files; sequence anything that overlaps.
 
-The parent verifies the diff and test results before moving on.
+The parent verifies the diff and test results (`superpowers:verification-before-completion`) before moving on.
 
 ## Code review
 
@@ -58,8 +69,9 @@ Implementation follows TDD: write the failing test, watch it fail, make it pass,
 
 ```
 .worktrees/                              # gitignored, agent worktrees
+.claude/commands/                        # /task-init, /task-implement (committed)
 docs/
   superpowers/                           # gitignored
-    specs/YYYY-MM-DD-<topic>-design.md   # design docs
+    specs/YYYY-MM-DD-<topic>-design.md   # design docs (issues live in Plane, not on disk)
 pdf_crop/                                # actual project
 ```

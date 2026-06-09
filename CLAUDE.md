@@ -72,12 +72,22 @@ cd thermal-qr && ./tests/run.sh                             # test
 
 ## Workflow & agents
 
-The full loop (brainstorm → spec → worktree → TDD → review → PR) lives in
-[`HARNESS.md`](HARNESS.md) and [`AGENTS.md`](AGENTS.md). Key rules:
+The full loop (brainstorm → spec → Plane issue(s) → worktree → TDD → verify →
+review → PR) lives in [`HARNESS.md`](HARNESS.md) and [`AGENTS.md`](AGENTS.md),
+wrapped by two commands: **`/task-init`** (brainstorm → spec → file issues) and
+**`/task-implement`** (worktree → TDD → review → PR). Key rules:
 
-- **Specs, plans, and issues are local-only** under `docs/superpowers/`
-  (gitignored). **Never commit them.** The committed record is the code + PR.
-- **Use worktrees** under `.worktrees/` (gitignored) for implementation work.
-- **Use the issue tracker** at `docs/superpowers/issues/` to plan multi-step work.
-- Use the `superpowers` plugin: `brainstorm` before non-trivial work,
-  `requesting-code-review` before every PR. **Report findings, don't auto-fix.**
+- **Always use superpowers.** Invoke the named skill at each stage
+  (`brainstorming`, `using-git-worktrees`, `test-driven-development`,
+  `dispatching-parallel-agents`, `verification-before-completion`,
+  `requesting-code-review`). **Report findings, don't auto-fix.**
+- **Specs and plans are local-only** under `docs/superpowers/` (gitignored).
+  **Never commit them.** The committed record is the code + PR.
+- **Issues live in Plane** — project **Utils** (`UTILS`). Each issue gets a
+  project label (`pdf_crop`/`music-lyrics`/`thermal-qr`/`pxe-boot`) and a type
+  label (`feat`/`fix`/`refactor`/`test`/`docs`/`chore`); states go
+  `Todo → In Progress → Done`. Not in local files.
+- **Always use worktrees** under `.worktrees/` (gitignored) for implementation;
+  never work in the main checkout. Multiple issues run as parallel agents, one
+  worktree each.
+- **Conventional commits always**, scoped per sub-project.
