@@ -50,8 +50,7 @@ def _redact_qr_in_place(dest: Path) -> int:
     from pdf_crop.features.qr_redact import service as qr_service
 
     try:
-        total = pdf_io.page_count(pdf_io.open_pdf(dest))
-        findings = qr_service.scan(dest, list(range(1, total + 1)))
+        findings = qr_service.scan(dest)
         if not findings.codes:
             return 0
         tmp = dest.with_name(f"{dest.stem}.qr-tmp.pdf")

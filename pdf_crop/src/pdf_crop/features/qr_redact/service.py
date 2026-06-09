@@ -36,13 +36,18 @@ class QrFindings:
         return dict(Counter(c.symbology for c in self.codes))
 
 
-def scan(path: Path, pages) -> QrFindings:
-    """Scan 1-indexed `pages` of the PDF at `path` for QR codes / barcodes."""
+def scan(path: Path, pages=None) -> QrFindings:
+    """Scan 1-indexed `pages` of the PDF at `path` for QR codes / barcodes.
+
+    `pages=None` scans every page.
+    """
     from pyzbar.pyzbar import decode
 
     findings = QrFindings()
     doc = fitz.open(str(path))
     try:
+        if pages is None:
+            pages = range(1, doc.page_count + 1)
         for page_number in pages:
             image = imaging.render_page(doc[page_number - 1], dpi=DPI)
             for sym in decode(image):
