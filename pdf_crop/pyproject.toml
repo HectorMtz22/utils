@@ -4,7 +4,9 @@ version = "0.1.0"
 description = "CLI + TUI to extract page ranges from PDFs"
 requires-python = ">=3.12"
 dependencies = [
+    "pymupdf>=1.27.2.3",
     "pypdf>=5.0",
+    "pyzbar>=0.1.9",
     "textual>=0.80",
 ]
 
@@ -23,8 +25,15 @@ dev = [
     "pytest>=8.0",
     "pytest-asyncio>=1.4.0",
     "reportlab>=4.0",
+    "segno>=1.6.6",
 ]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+filterwarnings = [
+    # PyMuPDF's SWIG bindings emit these at import on Python 3.12; not our code.
+    "ignore:builtin type SwigPyPacked has no __module__ attribute:DeprecationWarning",
+    "ignore:builtin type SwigPyObject has no __module__ attribute:DeprecationWarning",
+    "ignore:builtin type swigvarlink has no __module__ attribute:DeprecationWarning",
+]
