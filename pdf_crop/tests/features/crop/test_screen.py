@@ -21,6 +21,19 @@ def test_app_threads_sanitize_to_screen(three_page_pdf):
     assert app._sanitize is True
 
 
+async def test_crop_button_reachable_in_short_terminal(three_page_pdf):
+    # The redact/QR/OCR/sanitize/metadata options make the form taller than a
+    # normal terminal, and the action buttons sit at the very bottom. The form
+    # must scroll, or "Crop" is clipped off-screen and unreachable.
+    app = PdfCropApp(three_page_pdf)
+    async with app.run_test(size=(80, 20)) as pilot:
+        screen = app.screen
+        crop_btn = screen.query_one("#crop_btn")
+        crop_btn.scroll_visible(animate=False)
+        await pilot.pause()
+        assert screen.region.contains_region(crop_btn.region)
+
+
 async def test_list_metadata_button_renders_inventory(pdf_with_metadata):
     app = PdfCropApp(pdf_with_metadata)
     async with app.run_test(size=(120, 60)) as pilot:

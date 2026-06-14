@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from textual.app import ComposeResult
-from textual.containers import Vertical
+from textual.containers import VerticalScroll
 from textual.screen import Screen
 from textual.widgets import Button, Checkbox, Footer, Header, Input, Static
 
@@ -30,7 +30,7 @@ class CropScreen(Screen):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        yield Vertical(
+        yield VerticalScroll(
             Static(f"File: {self.src.name}"),
             Static(f"Total pages: {self.total}"),
             Input(placeholder='e.g. 1-5,8,11-13', id="range_input"),
