@@ -47,8 +47,17 @@
     text-align: center;
 }
 
+/* The rendered page image fills the rest of the pane, centred. */
 #preview_image {
+    width: 1fr;
     height: 1fr;
+    align: center middle;
+    content-align: center middle;
+}
+
+/* Loading / "Preview unavailable" line under the image. */
+#preview_message {
+    height: auto;
     content-align: center middle;
     text-align: center;
     color: $text-muted;
