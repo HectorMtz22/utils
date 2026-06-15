@@ -56,6 +56,7 @@ async def test_sanitize_checkbox_strips_on_crop(pdf_with_metadata):
         screen.query_one("#sanitize_chk").value = True
         await pilot.pause()
         await pilot.click("#crop_btn")
+        await app.workers.wait_for_complete()
         await pilot.pause()
 
     out = pdf_with_metadata.with_name("with_metadata_xmp_cropped.pdf")
@@ -71,12 +72,14 @@ async def test_scan_then_redact_writes_clean_pdf(text_pdf_factory):
         screen.query_one("#cat_clabe_chk").value = True
         await pilot.pause()
         await pilot.click("#scan_btn")
+        await app.workers.wait_for_complete()
         await pilot.pause()
         preview = str(screen.query_one("#preview_msg").content)
         assert "1" in preview
         assert screen.query_one("#apply_redaction_chk").disabled is False
         screen.query_one("#apply_redaction_chk").value = True
         await pilot.click("#crop_btn")
+        await app.workers.wait_for_complete()
         await pilot.pause()
 
     from pdf_crop.shared.pdf_io import open_pdf
@@ -87,12 +90,13 @@ async def test_scan_then_redact_writes_clean_pdf(text_pdf_factory):
 async def test_scan_no_matches_keeps_apply_disabled(text_pdf_factory):
     src = text_pdf_factory(["nothing to see here"])
     app = PdfCropApp(src)
-    async with app.run_test() as pilot:
+    async with app.run_test(size=(120, 60)) as pilot:
         screen = app.screen
         screen.query_one("#range_input").value = "1"
         screen.query_one("#cat_clabe_chk").value = True
         await pilot.pause()
         await pilot.click("#scan_btn")
+        await app.workers.wait_for_complete()
         await pilot.pause()
         assert screen.query_one("#apply_redaction_chk").disabled is True
         assert "nothing to redact" in str(screen.query_one("#preview_msg").content)
@@ -108,6 +112,7 @@ async def test_scan_lists_found_qr_codes(qr_pdf_factory):
         screen.query_one("#redact_qr_chk").value = True
         await pilot.pause()
         await pilot.click("#scan_btn")
+        await app.workers.wait_for_complete()
         await pilot.pause()
         preview = str(screen.query_one("#preview_msg").content)
         # The decoded payload is exposed so the user can verify it's their data.
@@ -138,6 +143,7 @@ async def test_crop_shows_error_on_qr_second_pass_failure(text_pdf_factory, monk
         screen.query_one("#redact_qr_chk").value = True
         await pilot.pause()
         await pilot.click("#crop_btn")
+        await app.workers.wait_for_complete()
         await pilot.pause()
         error = str(screen.query_one("#error_msg").content)
         assert "QR" in error or "redaction failed" in error
@@ -169,6 +175,7 @@ async def test_crop_runs_ocr_second_pass_with_selected_categories(text_pdf_facto
         screen.query_one("#cat_name_chk").value = True
         await pilot.pause()
         await pilot.click("#crop_btn")
+        await app.workers.wait_for_complete()
         await pilot.pause()
 
     assert calls["categories"] == {"clabe", "name"}
@@ -194,6 +201,7 @@ async def test_crop_shows_error_on_ocr_second_pass_failure(text_pdf_factory, mon
         screen.query_one("#cat_clabe_chk").value = True  # a category so OCR runs
         await pilot.pause()
         await pilot.click("#crop_btn")
+        await app.workers.wait_for_complete()
         await pilot.pause()
         error = str(screen.query_one("#error_msg").content)
         assert "OCR" in error or "redaction failed" in error
@@ -217,6 +225,7 @@ async def test_scan_shows_error_on_qr_preview_failure(text_pdf_factory, monkeypa
         screen.query_one("#redact_qr_chk").value = True
         await pilot.pause()
         await pilot.click("#scan_btn")
+        await app.workers.wait_for_complete()
         await pilot.pause()
         error = str(screen.query_one("#error_msg").content)
         assert "QR" in error or "scan failed" in error
@@ -242,3 +251,78 @@ async def test_crop_with_redact_qr_removes_qr_from_output(qr_pdf_factory):
     pix = doc[0].get_pixmap(dpi=200)
     img = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
     assert decode(img) == []
+
+
+async def test_screen_has_three_labeled_sections(three_page_pdf):
+    app = PdfCropApp(three_page_pdf)
+    async with app.run_test(size=(120, 60)) as pilot:
+        screen = app.screen
+        # The three grouped sections are present and queryable by id.
+        assert screen.query_one("#pages_section")
+        assert screen.query_one("#redaction_section")
+        assert screen.query_one("#output_section")
+
+
+async def test_screen_has_preview_pane(three_page_pdf):
+    app = PdfCropApp(three_page_pdf)
+    async with app.run_test(size=(120, 60)) as pilot:
+        from pdf_crop.features.crop.preview import PagePreview
+
+        screen = app.screen
+        preview = screen.query_one(PagePreview)
+        assert preview.total == 3
+        assert preview.current == 1
+
+
+async def test_typing_range_updates_included_badge(three_page_pdf):
+    from pdf_crop.features.crop.preview import PagePreview
+
+    app = PdfCropApp(three_page_pdf)
+    async with app.run_test(size=(120, 60)) as pilot:
+        screen = app.screen
+        preview = screen.query_one(PagePreview)
+        # Page 1 is in "1-2"; the badge should read "included".
+        screen.query_one("#range_input").value = "1-2"
+        await pilot.pause()
+        status = str(screen.query_one("#preview_status").content)
+        assert "1/3" in status
+        assert "included" in status
+        # Page 1 is NOT in "3"; the badge should flip to "excluded".
+        screen.query_one("#range_input").value = "3"
+        await pilot.pause()
+        status = str(screen.query_one("#preview_status").content)
+        assert "excluded" in status
+
+
+async def test_crop_shows_persistent_result_without_exiting(three_page_pdf):
+    app = PdfCropApp(three_page_pdf)
+    async with app.run_test(size=(120, 60)) as pilot:
+        screen = app.screen
+        screen.query_one("#range_input").value = "1"
+        await pilot.pause()
+        await pilot.click("#crop_btn")
+        await app.workers.wait_for_complete()
+        await pilot.pause()
+        result = str(screen.query_one("#result_msg").content)
+        assert "Wrote" in result
+        # Crop no longer exits the app; it's still running and can crop again.
+        assert app.is_running is True
+
+
+async def test_typing_in_input_does_not_trigger_crop(three_page_pdf):
+    # The single-letter `c` crop binding must not fire while an Input is focused.
+    # With a *valid* range set, a broken gate would actually crop and write a file;
+    # the char must instead just land in the focused (names) field, with no crop.
+    app = PdfCropApp(three_page_pdf)
+    async with app.run_test(size=(120, 60)) as pilot:
+        screen = app.screen
+        screen.query_one("#range_input").value = "1"
+        screen.query_one("#names_input").focus()
+        await pilot.pause()
+        await pilot.press("c")
+        await app.workers.wait_for_complete()
+        await pilot.pause()
+        assert "c" in screen.query_one("#names_input").value
+        assert "Wrote" not in str(screen.query_one("#result_msg").content)
+        assert app.is_running is True
+        assert not list(three_page_pdf.parent.glob("*_cropped*.pdf"))
