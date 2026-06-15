@@ -4,11 +4,70 @@ CLI + TUI to extract a page range from a PDF.
 
 ```bash
 uv sync
-uv run pdfcrop Document.pdf            # opens TUI for page selection
-uv run pdfcrop Document.pdf 1-5,8      # direct mode
+uv run pdfcrop Document.pdf            # opens the two-pane TUI
+uv run pdfcrop Document.pdf 1-5,8      # direct mode (no TUI)
 ```
 
 Output: `Document_cropped.pdf` next to the source. If it exists, suffixed `(1)`, `(2)`, …
+
+## The TUI
+
+Running `pdfcrop` on a file with no range opens a **two-pane** terminal UI:
+grouped controls on the left, a live preview of the current page on the right.
+
+```
+┌ Pages ────────┐  ┌ Preview — Document.pdf ──┐
+│ Range: 1-5,8  │  │  < prev   3/12   next >  │
+├ Redaction ────┤  │                          │
+│ [ ] CLABE     │  │   [ rendered page 3 ]    │
+│ [ ] Cards     │  │                          │
+│ [ ] RFC/CURP  │  │   Page 3/12 — included   │
+│ [ ] Names     │  │                          │
+│ [Scan]        │  └──────────────────────────┘
+├ Output ───────┤
+│ [ ] Rebuild   │
+└───────────────┘
+        [ Crop ]   [ Cancel ]
+```
+
+The left pane groups controls into three sections:
+
+- **Pages** — type a page range (`1-5,8,11-13`), validated as you type.
+- **Redaction** — the CLABE / card / RFC-CURP / name detectors, plus the
+  *Redact QR/barcodes* and *OCR scan* toggles (see the sections below).
+- **Output** — *Rebuild clean* (strip non-essential metadata) and *List
+  metadata* (print an inventory of what's in the file).
+
+The right **preview** renders the actual page as an image. Step through pages
+with `< prev` / `next >` or the arrow keys; the badge reads `Page X/Y` and
+whether that page is **included** in or **excluded** from your current range, so
+you can confirm the range visually before cropping.
+
+Press **Crop** (or `c`) to write the output. The result stays on screen
+(`Wrote …`) so you can tweak the range and crop again — `Cancel` or `q` exits.
+
+### Keybindings
+
+| Key | Action |
+|---|---|
+| `s` | Scan for sensitive data |
+| `c` / `enter` | Crop |
+| `←` / `h`,  `→` / `l` | Previous / next page |
+| `?` / `F1` | Toggle the help overlay |
+| `q` / `esc` | Quit |
+
+These keys act on the screen only when a text field isn't focused — while you're
+typing in the **Range** or **names** box they go to the field, so you can enter
+a range freely. Use the buttons or click away from the field to invoke them.
+
+### Page preview rendering
+
+The preview uses [`textual-image`](https://pypi.org/project/textual-image/),
+which auto-detects your terminal's graphics protocol (Kitty / iTerm2 / sixel)
+and falls back to unicode half-blocks elsewhere — so the preview works in any
+terminal, just at lower fidelity without graphics support. Rendering runs off
+the UI thread; if a page can't be rendered the pane shows `Preview unavailable`
+instead of crashing.
 
 ## Redaction (TUI)
 
@@ -16,7 +75,7 @@ The TUI can **truly remove** sensitive data from the cropped output — the
 matched characters are deleted from the PDF's text layer, so they can't be
 copied or extracted (not just covered with a box).
 
-In the TUI, tick the categories you want and press **Scan**:
+In the **Redaction** section, tick the categories you want and press **Scan**:
 
 - **CLABE** — 18-digit Mexican interbank account numbers
 - **Card numbers** — 16-digit card numbers (validated with the Luhn checksum)
