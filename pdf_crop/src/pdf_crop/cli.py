@@ -1,3 +1,4 @@
+from importlib.metadata import version
 from pathlib import Path
 import argparse
 import sys
@@ -25,6 +26,11 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="pdfcrop",
         description="Extract a page range from a PDF.",
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {version('pdf-crop')}",
     )
     parser.add_argument("file", type=Path, help="PDF to crop")
     parser.add_argument(
