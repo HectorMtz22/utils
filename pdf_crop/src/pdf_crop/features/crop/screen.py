@@ -71,7 +71,7 @@ class CropScreen(Screen):
                 yield self._pages_section()
                 yield self._redaction_section()
                 yield self._output_section()
-            preview = PagePreview(total=self.total, id="preview")
+            preview = PagePreview(total=self.total, src=self.src, id="preview")
             preview.border_title = f"Preview — {self.src.name}"
             yield preview
         with Vertical(id="action_bar"):
