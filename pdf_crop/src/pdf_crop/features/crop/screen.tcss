@@ -1,0 +1,89 @@
+/* Two-pane crop screen. Left = controls (sections), right = page preview. */
+
+#crop_body {
+    height: 1fr;
+}
+
+#controls {
+    width: 40%;
+    padding: 0 1;
+}
+
+/* Each left-pane group: a titled border with breathing room. */
+.section {
+    border: round $primary;
+    border-title-color: $accent;
+    border-title-style: bold;
+    padding: 0 1;
+    margin-bottom: 1;
+    height: auto;
+}
+
+#pages_hint {
+    color: $text-muted;
+}
+
+.found-summary {
+    color: $text-muted;
+}
+
+/* Right pane: the framed preview. */
+#preview {
+    width: 60%;
+    border: round $primary;
+    border-title-color: $accent;
+    border-title-style: bold;
+    padding: 0 1;
+}
+
+#preview_nav {
+    height: auto;
+    align: center middle;
+}
+
+#preview_status {
+    width: 1fr;
+    content-align: center middle;
+    text-align: center;
+}
+
+#preview_image {
+    height: 1fr;
+    content-align: center middle;
+    text-align: center;
+    color: $text-muted;
+}
+
+/* Bottom action bar + result/error lines. */
+#action_bar {
+    dock: bottom;
+    height: auto;
+    padding: 0 1;
+}
+
+#action_bar Static {
+    height: auto;
+}
+
+#action_buttons {
+    height: auto;
+    align: left middle;
+}
+
+#action_bar Button {
+    margin-right: 2;
+}
+
+/* Help overlay. */
+HelpScreen {
+    align: center middle;
+}
+
+#help_panel {
+    width: 60;
+    height: auto;
+    border: round $accent;
+    border-title-color: $accent;
+    padding: 1 2;
+    background: $panel;
+}
