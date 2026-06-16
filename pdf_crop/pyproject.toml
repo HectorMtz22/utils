@@ -1,6 +1,6 @@
 [project]
 name = "pdf-crop"
-version = "0.1.0"
+dynamic = ["version"]
 description = "CLI + TUI to extract page ranges from PDFs"
 requires-python = ">=3.12"
 dependencies = [
@@ -17,8 +17,19 @@ dependencies = [
 pdfcrop = "pdf_crop.cli:main"
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
+
+[tool.hatch.version]
+source = "vcs"
+tag-pattern = "pdf_crop-v(?P<version>.+)"
+fallback-version = "0.0.0"
+
+[tool.hatch.version.raw-options]
+# The package lives in a subdir of the monorepo, so the git root is one level
+# up; setuptools-scm doesn't search parents by default.
+root = ".."
+git_describe_command = ["git", "describe", "--dirty", "--tags", "--long", "--match", "pdf_crop-v*"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/pdf_crop"]
