@@ -72,6 +72,25 @@ cd thermal-qr && ./tests/run.sh                             # test
 - **No Claude attribution.** Don't add `Co-Authored-By: Claude …` to commit
   messages or `🤖 Generated with Claude Code` to PR bodies.
 
+### Releasing / versioning
+
+Releases are **git tags** named `<project-dir>-vX.Y.Z` (e.g. `pdf_crop-v0.2.0`,
+`pxe-boot-v0.1.9`). The `uv`/hatchling projects (`pdf_crop`, `pxe-boot`) derive
+their version automatically from those tags via `hatch-vcs` at build time — in a
+tag-versioned project, **never edit a `version =` field by hand** (its
+`pyproject.toml` declares `dynamic = ["version"]`). The script projects
+(`thermal-qr`, `music-lyrics`) aren't packaged this way and carry no version field.
+
+- After tagging a release, refresh the global tool:
+  `cd <project> && uv tool install --force .`. The new version busts uv's wheel
+  cache, so `--no-cache` isn't needed.
+- For live dev iteration just use `uv run` — it rebuilds against the working tree.
+- Between tags, builds report a dev version like `0.1.1.devN+g<hash>` (and a
+  `.dYYYYMMDD` suffix when the tree is dirty). That's expected, not a bug.
+- Each project's package lives one level below the git root, so its
+  `[tool.hatch.version.raw-options]` sets `root = ".."` and a
+  `--match <project-dir>-v*` describe command to ignore other projects' tags.
+
 ## Workflow & agents
 
 The full loop (brainstorm → spec → Plane issue(s) → worktree → TDD → verify →

@@ -19,3 +19,12 @@ def test_version_flag_works_without_file_argument(capsys):
         main(["--version"])
     assert excinfo.value.code == 0
     assert capsys.readouterr().err == ""
+
+
+def test_version_is_derived_from_git_tags_not_fallback():
+    # hatch-vcs derives the version from git tags at build time. A real,
+    # tag-derived version proves the plugin ran; the bare fallback "0.0.0"
+    # means git describe found nothing (misconfigured tag-pattern/match).
+    resolved = version("pdf-crop")
+    assert resolved
+    assert resolved != "0.0.0"
