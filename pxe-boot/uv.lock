@@ -40,7 +40,6 @@ wheels = [
 
 [[package]]
 name = "pxe-boot"
-version = "0.1.8"
 source = { editable = "." }
 
 [package.dev-dependencies]
