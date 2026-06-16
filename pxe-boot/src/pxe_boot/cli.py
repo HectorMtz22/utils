@@ -1,7 +1,7 @@
 import argparse
 import sys
+from importlib.metadata import version
 
-from pxe_boot import __version__
 from pxe_boot.features.cleanup import command as cleanup_cmd
 from pxe_boot.features.iso_mode import command as iso_cmd
 from pxe_boot.features.netboot_mode import command as netboot_cmd
@@ -26,7 +26,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "--iface", metavar="IFACE", default=None,
         help="Force this network interface (e.g. en0) instead of the default-route autodetect",
     )
-    p.add_argument("--version", action="version", version=f"pxe-boot {__version__}")
+    p.add_argument("--version", action="version", version=f"pxe-boot {version('pxe-boot')}")
     return p
 
 

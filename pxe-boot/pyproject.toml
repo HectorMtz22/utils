@@ -1,6 +1,6 @@
 [project]
 name = "pxe-boot"
-version = "0.1.8"
+dynamic = ["version"]
 description = "macOS CLI to PXE-boot a PC on the LAN (netboot.xyz or local ISO)"
 requires-python = ">=3.12"
 dependencies = []
@@ -9,8 +9,19 @@ dependencies = []
 pxe-boot = "pxe_boot.cli:main"
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
+
+[tool.hatch.version]
+source = "vcs"
+tag-pattern = "pxe-boot-v(?P<version>.+)"
+fallback-version = "0.0.0"
+
+[tool.hatch.version.raw-options]
+# The package lives in the pxe-boot/ subdir of the monorepo; point setuptools-scm
+# at the repo root so it can find the .git and our tags.
+root = ".."
+git_describe_command = ["git", "describe", "--dirty", "--tags", "--long", "--match", "pxe-boot-v*"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/pxe_boot"]

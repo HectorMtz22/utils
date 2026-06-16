@@ -1,8 +1,20 @@
 import sys
+from importlib.metadata import version
 
 import pytest
 
 from pxe_boot import cli
+
+
+def test_version_flag_prints_metadata_version_and_exits_zero(capsys, monkeypatch):
+    monkeypatch.setattr(sys, "argv", ["pxe-boot", "--version"])
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+    assert exc.value.code == 0
+    resolved = version("pxe-boot")
+    assert resolved
+    assert resolved != "0.0.0"  # not the hatch-vcs fallback
+    assert capsys.readouterr().out == f"pxe-boot {resolved}\n"
 
 
 def test_help_exits_zero(capsys, monkeypatch):
