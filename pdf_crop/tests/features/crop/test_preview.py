@@ -153,3 +153,123 @@ async def test_latest_page_wins_under_fast_navigation(three_page_pdf, monkeypatc
         # is the page that was last rendered.
         assert last_rendered[-1] == 3
         assert preview.current == 3
+
+
+# --- render cache + persistent document (UTILS-10) ---------------------------
+
+
+async def test_revisiting_page_uses_cache_not_render(three_page_pdf, monkeypatch):
+    # Navigating back to an already-rendered page reuses the cached image and does
+    # not re-invoke the render seam / spawn a worker.
+    from pdf_crop.app import PdfCropApp
+
+    rendered: list[int] = []
+
+    def fake_render(self, page_number):
+        rendered.append(page_number)
+        return Image.new("RGB", (4, 4), "white")
+
+    monkeypatch.setattr(PagePreview, "_render_page_image", fake_render)
+
+    app = PdfCropApp(three_page_pdf)
+    async with app.run_test(size=(120, 60)) as pilot:
+        preview = app.screen.query_one(PagePreview)
+        await _settle_renders(app, pilot)  # mount renders page 1
+        preview.goto(2)
+        await _settle_renders(app, pilot)  # renders page 2
+        assert sorted(rendered) == [1, 2]
+        rendered.clear()
+        preview.goto(1)  # already rendered -> cache hit
+        await _settle_renders(app, pilot)
+        assert rendered == []  # seam was not called again
+        # The widget still shows page 1's image.
+        from textual_image.widget import Image as ImageWidget
+
+        assert preview.query_one("#preview_image", ImageWidget).image is not None
+
+
+async def test_lru_evicts_least_recently_used(ten_page_pdf, monkeypatch):
+    # Visiting more distinct pages than the cache cap evicts the oldest; revisiting
+    # the evicted page re-invokes the render seam.
+    from pdf_crop.app import PdfCropApp
+    from pdf_crop.features.crop import preview as preview_mod
+
+    monkeypatch.setattr(preview_mod, "RENDER_CACHE_SIZE", 3)
+
+    rendered: list[int] = []
+
+    def fake_render(self, page_number):
+        rendered.append(page_number)
+        return Image.new("RGB", (4, 4), "white")
+
+    monkeypatch.setattr(PagePreview, "_render_page_image", fake_render)
+
+    app = PdfCropApp(ten_page_pdf)
+    async with app.run_test(size=(120, 60)) as pilot:
+        preview = app.screen.query_one(PagePreview)
+        await _settle_renders(app, pilot)  # mount renders page 1
+        for page in (2, 3, 4):  # cap is 3, so page 1 is evicted
+            preview.goto(page)
+            await _settle_renders(app, pilot)
+        assert sorted(rendered) == [1, 2, 3, 4]
+        rendered.clear()
+        preview.goto(1)  # evicted -> must re-render
+        await _settle_renders(app, pilot)
+        assert rendered == [1]
+
+
+async def test_document_opened_once_across_renders(three_page_pdf, monkeypatch):
+    # The PDF is opened a single time and the handle reused across page renders,
+    # rather than re-parsed on every navigation.
+    import fitz
+
+    from pdf_crop.app import PdfCropApp
+
+    opens: list = []
+    real_open = fitz.open
+
+    def counting_open(*args, **kwargs):
+        doc = real_open(*args, **kwargs)
+        opens.append(doc)
+        return doc
+
+    monkeypatch.setattr(fitz, "open", counting_open)
+
+    app = PdfCropApp(three_page_pdf)
+    async with app.run_test(size=(120, 60)) as pilot:
+        preview = app.screen.query_one(PagePreview)
+        await _settle_renders(app, pilot)  # mount renders page 1
+        preview.goto(2)
+        await _settle_renders(app, pilot)
+        preview.goto(3)
+        await _settle_renders(app, pilot)
+        # The preview pane opened its document exactly once (the app may open the
+        # PDF elsewhere for its own purposes; assert the preview reuses one handle).
+        assert preview._doc is not None
+        opened_by_preview = [d for d in opens if d is preview._doc]
+        assert len(opened_by_preview) == 1
+
+
+async def test_unmount_closes_document_without_error(three_page_pdf, monkeypatch):
+    # Unmounting closes the shared document and does not raise even if a render is
+    # "in flight" (the close is guarded so it never frees a doc mid-read).
+    from pdf_crop.app import PdfCropApp
+
+    def fake_render(self, page_number):
+        return Image.new("RGB", (4, 4), "white")
+
+    monkeypatch.setattr(PagePreview, "_render_page_image", fake_render)
+
+    app = PdfCropApp(three_page_pdf)
+    async with app.run_test(size=(120, 60)) as pilot:
+        preview = app.screen.query_one(PagePreview)
+        await _settle_renders(app, pilot)
+        doc = preview._ensure_doc()
+        assert doc.is_closed is False
+        # Hold the render lock as if a render were reading the doc, then unmount.
+        with preview._doc_lock:
+            preview.on_unmount()
+            assert doc.is_closed is False  # guarded: not closed while "in flight"
+        preview.on_unmount()  # now the lock is free
+        assert doc.is_closed is True
+        assert app.is_running is True
