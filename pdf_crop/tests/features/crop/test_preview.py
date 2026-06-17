@@ -1,6 +1,30 @@
+import fitz
 from PIL import Image
 
 from pdf_crop.features.crop.preview import PagePreview
+from pdf_crop.shared import imaging
+
+
+# --- rasterizer aspect-ratio guard (UTILS-11) --------------------------------
+#
+# The preview distortion is a *display* bug (textual-image stretched the image
+# when both CSS dimensions were pinned), not a rasterizer bug. This guard pins
+# that down: `imaging.render_page` must produce a PIL image whose aspect ratio
+# matches the source page's point-size ratio, so a future regression in the
+# render pipeline can't be mistaken for the display fix.
+def test_render_page_preserves_source_aspect_ratio():
+    # A clearly portrait page (US Letter, 612x792 pt) so the assertion is
+    # meaningful — a square page would pass even a ratio-mangling rasterizer.
+    doc = fitz.open()
+    page = doc.new_page(width=612, height=792)
+    source_ratio = page.rect.width / page.rect.height
+
+    img = imaging.render_page(page, dpi=150)
+
+    image_ratio = img.width / img.height
+    # Rounding to whole pixels at 150 dpi introduces at most sub-pixel error;
+    # a generous tolerance still catches any real squish/stretch.
+    assert abs(image_ratio - source_ratio) < 0.01
 
 
 def test_starts_on_first_page():
@@ -273,3 +297,47 @@ async def test_unmount_closes_document_without_error(three_page_pdf, monkeypatch
         preview.on_unmount()  # now the lock is free
         assert doc.is_closed is True
         assert app.is_running is True
+
+
+# --- preview pane contains the image, doesn't stretch it (UTILS-11) ----------
+
+
+async def test_preview_image_is_contained_not_stretched(three_page_pdf, monkeypatch):
+    # The fix: `#preview_image` no longer pins both width and height, so
+    # textual-image preserves the source aspect ratio and *contains* the image
+    # within the pane instead of stretching it to fill the whole box.
+    #
+    # We feed a deliberately tall portrait image through the render seam, then
+    # assert the displayed widget is narrower than the pane: a contained tall
+    # image fills the pane's *height* and leaves horizontal slack, so its width
+    # is strictly less than the pane's content width. textual-image's sizing is
+    # deterministic headless (it derives a fixed cell geometry from
+    # `get_cell_size`), so this is stable, not flaky. Under the buggy `1fr/1fr`
+    # rule the image was forced to the pane's full width (and height), filling
+    # the box and distorting the page — this assertion fails in that case.
+    from pdf_crop.app import PdfCropApp
+    from textual_image.widget import Image as ImageWidget
+
+    # 1:4, much taller than wide, so a contained fit must leave horizontal slack.
+    portrait = Image.new("RGB", (400, 1600), "white")
+
+    def fake_render(self, page_number):
+        return portrait
+
+    monkeypatch.setattr(PagePreview, "_render_page_image", fake_render)
+
+    app = PdfCropApp(three_page_pdf)
+    async with app.run_test(size=(120, 60)) as pilot:
+        preview = app.screen.query_one(PagePreview)
+        await _settle_renders(app, pilot)
+        await pilot.pause()  # let layout resolve the image's content size
+
+        image = preview.query_one("#preview_image", ImageWidget)
+        pane_width = preview.content_size.width
+        image_width = image.content_size.width
+        # Sanity: the harness actually laid the widget out (non-zero), so the
+        # assertion below is meaningful and not vacuously true on a 0x0 widget.
+        assert pane_width > 0 and image.content_size.height > 0
+        # Contained, not stretched: a tall page can't fill the pane width without
+        # distortion, so the displayed image is strictly narrower than the pane.
+        assert image_width < pane_width
