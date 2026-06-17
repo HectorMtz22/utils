@@ -82,8 +82,11 @@ tag-versioned project, **never edit a `version =` field by hand** (its
 (`thermal-qr`, `music-lyrics`) aren't packaged this way and carry no version field.
 
 - After tagging a release, refresh the global tool:
-  `cd <project> && uv tool install --force .`. The new version busts uv's wheel
-  cache, so `--no-cache` isn't needed.
+  `cd <project> && uv tool install --force --reinstall .`. Plain `--force`
+  reuses the already-installed build (so `pdfcrop --version` keeps reporting the
+  old version); `--reinstall` rebuilds from source so the new tag-derived
+  version is picked up. (`uv build` alone resolves the version correctly, so the
+  wheel cache isn't the issue — the source rebuild is what's needed.)
 - For live dev iteration just use `uv run` — it rebuilds against the working tree.
 - Between tags, builds report a dev version like `0.1.1.devN+g<hash>` (and a
   `.dYYYYMMDD` suffix when the tree is dirty). That's expected, not a bug.
