@@ -47,10 +47,16 @@
     text-align: center;
 }
 
-/* The rendered page image fills the rest of the pane, centred. */
+/* The rendered page image is contained within the pane, centred, with its
+ * aspect ratio preserved. textual-image distorts the image only when *both*
+ * width and height are pinned (it scales to fill that exact cell box); with
+ * both `auto` its sizing logic derives the height from the width via the source
+ * ratio and clamps both to the pane, so the page keeps its proportions and is
+ * letterboxed rather than stretched. `align`/`content-align` keep the contained
+ * image centred in the leftover space. */
 #preview_image {
-    width: 1fr;
-    height: 1fr;
+    width: auto;
+    height: auto;
     align: center middle;
     content-align: center middle;
 }
