@@ -34,6 +34,42 @@ async def test_crop_button_reachable_in_short_terminal(three_page_pdf):
         assert screen.region.contains_region(crop_btn.region)
 
 
+@pytest.mark.parametrize("size", [(120, 40), (200, 60)])
+async def test_action_buttons_not_clipped_by_footer(three_page_pdf, size):
+    # The Crop/Cancel buttons are 3 rows tall and live in the bottom action bar.
+    # They must sit *above* the Footer, fully visible — not have their bottom row
+    # hidden behind the footer (which also docks bottom). Regression for the
+    # dock-edge collision that clipped the last button row off-screen.
+    from textual.widgets import Footer
+
+    app = PdfCropApp(three_page_pdf)
+    async with app.run_test(size=size) as pilot:
+        await pilot.pause()
+        screen = app.screen
+        footer = screen.query_one(Footer)
+        crop_btn = screen.query_one("#crop_btn")
+        cancel_btn = screen.query_one("#cancel_btn")
+        assert crop_btn.region.bottom <= footer.region.y
+        assert cancel_btn.region.bottom <= footer.region.y
+
+
+async def test_crop_body_fills_header_to_action_bar(three_page_pdf):
+    # The two-pane body (controls + preview) must use the full vertical space
+    # between the Header and the action bar — no wasted band. Its top sits just
+    # below the Header and its bottom meets the action bar's top.
+    from textual.widgets import Header
+
+    app = PdfCropApp(three_page_pdf)
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        screen = app.screen
+        header = screen.query_one(Header)
+        body = screen.query_one("#crop_body")
+        action_bar = screen.query_one("#action_bar")
+        assert body.region.y == header.region.bottom
+        assert body.region.bottom == action_bar.region.y
+
+
 async def test_list_metadata_button_renders_inventory(pdf_with_metadata):
     app = PdfCropApp(pdf_with_metadata)
     async with app.run_test(size=(120, 60)) as pilot:
