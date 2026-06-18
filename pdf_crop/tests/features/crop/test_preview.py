@@ -452,12 +452,102 @@ async def test_preview_image_wide_page_preserves_aspect(three_page_pdf, monkeypa
         assert image.region.bottom <= pane.bottom
 
 
-async def test_preview_image_is_flush_right(three_page_pdf, monkeypatch):
-    # The image sits against the pane's inner right edge (not centred/left): its
-    # right edge meets the pane's inner right, and — being narrower than the pane
-    # (a portrait page can't fill the width without distortion) — it has a
-    # positive left offset, i.e. it was pushed right.
+# --- wrap pane: the frame hugs the Fit-sized page (UTILS-15) -----------------
+#
+# This supersedes the old UTILS-13 *flush-right* guard. Flush-right pushed a
+# narrow image against the right edge of a fixed-width (60%) pane, relying on the
+# pane being noticeably wider than the page. UTILS-15 makes the pane *hug* the
+# page instead: `_pin_pane_to_fit` sizes #preview to the contained image plus its
+# border+padding, so there is no longer meaningful horizontal slack to flush into
+# — the image essentially fills the pane width (minus the scroll gutter). The
+# premise of the flush-right test ("the image is much narrower than the pane, so
+# push it right") no longer holds, so we assert the new contract: the page is
+# contained with no overflow and the pane is sized to hug it, not left at a fixed
+# fraction of the screen.
+
+
+async def test_preview_pane_hugs_the_fit_page(three_page_pdf, monkeypatch):
+    # Wrap pane: #preview is sized to the contained page (image + chrome), so its
+    # width tracks the page rather than a fixed fraction of the screen, and
+    # #controls (now width: 1fr) takes the rest. The image stays contained inside
+    # the pane with no overflow, and the pane hugs it (only a thin gutter).
     from pdf_crop.app import PdfCropApp
+    from textual_image.widget import Image as ImageWidget
+
+    async def measure(image):
+        """Mount with `image` as the page and return (pane_width, controls_width,
+        pane_content_region, image_content_size)."""
+        monkeypatch.setattr(PagePreview, "_render_page_image", lambda self, n: image)
+        app = PdfCropApp(three_page_pdf)
+        async with app.run_test(size=(120, 60)) as pilot:
+            preview = app.screen.query_one(PagePreview)
+            await _settle_renders(app, pilot)
+            await pilot.pause()
+            img = preview.query_one("#preview_image", ImageWidget)
+            controls = app.screen.query_one("#controls")
+            return (
+                preview.region.width,
+                controls.region.width,
+                preview.content_region,
+                img.content_size,
+            )
+
+    # Realistic A4 at 150 dpi (~1240x1754 px) in both orientations. Wide enough
+    # that the nav row fits on one line, so the pane genuinely hugs the page (an
+    # exaggerated 1:4 sliver would force the nav to wrap and loosen the hug).
+    portrait = Image.new("RGB", (1240, 1754), "white")
+    landscape = Image.new("RGB", (1754, 1240), "white")
+
+    p_w, p_controls, p_pane, p_img = await measure(portrait)
+    l_w, _, _, _ = await measure(landscape)
+
+    # Load-bearing: the pane width *tracks the page aspect*. A landscape page is
+    # wider than a portrait one, so its pane is wider — a fixed-fraction pane
+    # (the pre-pin behaviour) would give the SAME width for both, so this catches
+    # a regression that drops the runtime pin.
+    assert l_w > p_w
+
+    # Portrait specifics: pane far short of the 120-col screen, #controls gets the
+    # rest (>= the floor), pane hugs the image (thin gutter), image contained.
+    assert p_img.width > 0 and p_img.height > 0
+    assert p_w < 100
+    assert p_controls >= PagePreview._MIN_CONTROLS_WIDTH
+    assert 0 <= p_pane.width - p_img.width <= 8
+
+
+# --- Fit / 100% zoom toggle (UTILS-15) ---------------------------------------
+
+
+def test_mode_defaults_to_fit():
+    # Zoom defaults to Fit (aspect-contained).
+    from pdf_crop.features.crop.preview import FIT
+
+    preview = PagePreview(total=3)
+    assert preview.mode == FIT
+
+
+def test_toggle_zoom_flips_fit_and_native():
+    # toggle_zoom alternates Fit <-> 100% without needing a mount.
+    from pdf_crop.features.crop.preview import FIT, NATIVE
+
+    preview = PagePreview(total=3)
+    preview.toggle_zoom()
+    assert preview.mode == NATIVE
+    preview.toggle_zoom()
+    assert preview.mode == FIT
+
+
+async def test_toggle_resizes_image_native_in_100_contained_in_fit(
+    three_page_pdf, monkeypatch
+):
+    # Toggling to 100% sizes the image to its *native* cell size (1 image pixel ~=
+    # 1 terminal pixel), which exceeds the Fit (contained) size; toggling back
+    # restores the contained size. We feed a portrait image whose native size is
+    # known: at the headless cell geometry (10x20 px/cell) a 400x1600 image is
+    # 40x80 cells, far larger than its contained Fit size, so the difference is
+    # unambiguous.
+    from pdf_crop.app import PdfCropApp
+    from textual_image._terminal import get_cell_size
     from textual_image.widget import Image as ImageWidget
 
     portrait = Image.new("RGB", (400, 1600), "white")
@@ -474,8 +564,138 @@ async def test_preview_image_is_flush_right(three_page_pdf, monkeypatch):
         await pilot.pause()
 
         image = preview.query_one("#preview_image", ImageWidget)
-        pane = preview.content_region
-        # Flush against the pane's inner right edge.
-        assert image.region.right == pane.right
-        # Pushed right, not centred or left: there is empty space on the left.
-        assert image.region.x - pane.x > 0
+        fit_size = image.content_size
+        assert fit_size.width > 0 and fit_size.height > 0
+
+        preview.toggle_zoom()  # -> 100%
+        await _settle_renders(app, pilot)
+        await pilot.pause()
+        native = image.content_size
+        # Native cell size derived from the source pixels and the cell geometry.
+        cell = get_cell_size()
+        assert native.width == round(portrait.width / cell.width)
+        assert native.height == round(portrait.height / cell.height)
+        # 100% is bigger than the contained Fit size (so it can be scrolled).
+        assert native.height > fit_size.height
+        assert native.width > fit_size.width
+
+        preview.toggle_zoom()  # -> Fit
+        await _settle_renders(app, pilot)
+        await pilot.pause()
+        assert image.content_size == fit_size
+
+
+async def test_100_percent_is_scrollable_fit_is_not(three_page_pdf, monkeypatch):
+    # The crux: in 100% the image overflows the scroll container's viewport — the
+    # image region exceeds the viewport and the scroll bounds (max_scroll_x/y) are
+    # positive, so it can be panned both ways. In Fit the contained image fits the
+    # viewport, so there's nothing to scroll.
+    from pdf_crop.app import PdfCropApp
+    from textual.containers import ScrollableContainer
+    from textual_image.widget import Image as ImageWidget
+
+    portrait = Image.new("RGB", (400, 1600), "white")
+
+    def fake_render(self, page_number):
+        return portrait
+
+    monkeypatch.setattr(PagePreview, "_render_page_image", fake_render)
+
+    app = PdfCropApp(three_page_pdf)
+    async with app.run_test(size=(120, 60)) as pilot:
+        preview = app.screen.query_one(PagePreview)
+        await _settle_renders(app, pilot)
+        await pilot.pause()
+
+        scroll = preview.query_one("#preview_scroll", ScrollableContainer)
+        image = preview.query_one("#preview_image", ImageWidget)
+        viewport = scroll.content_size
+        assert viewport.width > 0 and viewport.height > 0
+
+        # Fit: contained, nothing to scroll.
+        assert scroll.max_scroll_y == 0
+        assert scroll.max_scroll_x == 0
+        assert image.region.height <= viewport.height
+
+        preview.toggle_zoom()  # -> 100%
+        await _settle_renders(app, pilot)
+        await pilot.pause()
+        # The image region now exceeds the viewport in both dimensions, and the
+        # scroll container reports positive scroll range on both axes — pannable.
+        assert image.content_size.height > viewport.height
+        assert image.content_size.width > viewport.width
+        assert scroll.max_scroll_y > 0
+        assert scroll.max_scroll_x > 0
+
+
+async def test_pane_width_is_stable_across_modes(three_page_pdf, monkeypatch):
+    # HARD constraint: toggling Fit <-> 100% must not reflow the #preview /
+    # #controls split. The pane is pinned to the Fit width and a native-size page
+    # scrolls *inside* it, so the pane (and #controls) keep the same width in both
+    # modes even though the native page is far larger than the pane.
+    from pdf_crop.app import PdfCropApp
+
+    portrait = Image.new("RGB", (400, 1600), "white")
+
+    def fake_render(self, page_number):
+        return portrait
+
+    monkeypatch.setattr(PagePreview, "_render_page_image", fake_render)
+
+    app = PdfCropApp(three_page_pdf)
+    async with app.run_test(size=(120, 60)) as pilot:
+        preview = app.screen.query_one(PagePreview)
+        controls = app.screen.query_one("#controls")
+        await _settle_renders(app, pilot)
+        await pilot.pause()
+
+        fit_pane_w = preview.region.width
+        fit_controls_w = controls.region.width
+        assert fit_pane_w > 0
+
+        preview.toggle_zoom()  # -> 100% (native page much wider than the pane)
+        await _settle_renders(app, pilot)
+        await pilot.pause()
+        # Bounded: the pane did NOT widen to the native page, and #controls was
+        # not squeezed — both widths are unchanged.
+        assert preview.region.width == fit_pane_w
+        assert controls.region.width == fit_controls_w
+
+        preview.toggle_zoom()  # -> Fit again
+        await _settle_renders(app, pilot)
+        await pilot.pause()
+        assert preview.region.width == fit_pane_w
+        assert controls.region.width == fit_controls_w
+
+
+async def test_100_percent_preserves_aspect_ratio(three_page_pdf, monkeypatch):
+    # Native size must not distort: the image's cell ratio matches the source
+    # pixel ratio (within the rounding to whole cells at the headless 10x20 cell
+    # geometry). A landscape page is used so a ratio-mangling regression (e.g.
+    # pinning to a square) would be caught.
+    from pdf_crop.app import PdfCropApp
+    from textual_image._terminal import get_cell_size
+    from textual_image.widget import Image as ImageWidget
+
+    landscape = Image.new("RGB", (1600, 400), "white")  # 4:1
+
+    def fake_render(self, page_number):
+        return landscape
+
+    monkeypatch.setattr(PagePreview, "_render_page_image", fake_render)
+
+    app = PdfCropApp(three_page_pdf)
+    async with app.run_test(size=(120, 60)) as pilot:
+        preview = app.screen.query_one(PagePreview)
+        await _settle_renders(app, pilot)
+        await pilot.pause()
+        preview.toggle_zoom()  # -> 100%
+        await _settle_renders(app, pilot)
+        await pilot.pause()
+
+        image = preview.query_one("#preview_image", ImageWidget)
+        cell = get_cell_size()
+        # Native cells are the source pixels divided by the cell geometry; this is
+        # an exact aspect-preserving map (no stretch to a pinned box).
+        assert image.content_size.width == round(landscape.width / cell.width)
+        assert image.content_size.height == round(landscape.height / cell.height)

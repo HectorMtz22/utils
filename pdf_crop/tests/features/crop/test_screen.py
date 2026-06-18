@@ -345,6 +345,50 @@ async def test_crop_shows_persistent_result_without_exiting(three_page_pdf):
         assert app.is_running is True
 
 
+async def test_z_key_toggles_preview_zoom(three_page_pdf):
+    # The `z` binding delegates to the preview's zoom toggle (Fit <-> 100%) and
+    # doesn't collide with another binding.
+    from pdf_crop.features.crop.preview import FIT, NATIVE, PagePreview
+
+    app = PdfCropApp(three_page_pdf)
+    async with app.run_test(size=(120, 60)) as pilot:
+        preview = app.screen.query_one(PagePreview)
+        assert preview.mode == FIT
+        await pilot.press("z")
+        assert preview.mode == NATIVE
+        await pilot.press("z")
+        assert preview.mode == FIT
+
+
+async def test_z_in_input_does_not_toggle_zoom(three_page_pdf):
+    # While an Input is focused, `z` is a literal character, not the zoom toggle.
+    from pdf_crop.features.crop.preview import FIT, PagePreview
+
+    app = PdfCropApp(three_page_pdf)
+    async with app.run_test(size=(120, 60)) as pilot:
+        screen = app.screen
+        preview = screen.query_one(PagePreview)
+        screen.query_one("#names_input").focus()
+        await pilot.pause()
+        await pilot.press("z")
+        assert preview.mode == FIT  # unchanged
+        assert "z" in screen.query_one("#names_input").value
+
+
+async def test_zoom_button_toggles_preview_zoom(three_page_pdf):
+    # The nav-row toggle button flips the mode and shows the mode you'd switch to.
+    from pdf_crop.features.crop.preview import FIT, NATIVE, PagePreview
+
+    app = PdfCropApp(three_page_pdf)
+    async with app.run_test(size=(120, 60)) as pilot:
+        preview = app.screen.query_one(PagePreview)
+        assert preview.mode == FIT
+        assert str(preview.query_one("#zoom_btn").label) == "100%"
+        await pilot.click("#zoom_btn")
+        assert preview.mode == NATIVE
+        assert str(preview.query_one("#zoom_btn").label) == "Fit"
+
+
 async def test_typing_in_input_does_not_trigger_crop(three_page_pdf):
     # The single-letter `c` crop binding must not fire while an Input is focused.
     # With a *valid* range set, a broken gate would actually crop and write a file;
