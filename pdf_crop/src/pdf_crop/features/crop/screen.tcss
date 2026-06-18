@@ -27,16 +27,25 @@
     color: $text-muted;
 }
 
-/* Right pane: the framed preview. */
+/* Right pane: the framed preview. The nav row and message line are *docked*
+ * (top/bottom) so the page image is the pane's only in-flow child. That lets
+ * `align-horizontal: right` shift just the image flush against the pane's right
+ * edge: Textual's vertical layout has no per-child cross-axis alignment, and a
+ * container's `align` translates *all* in-flow children together — so with the
+ * full-width nav/message in flow the image can't be pushed right on its own.
+ * Docking them out of flow leaves the (narrower-than-pane) image free to align
+ * right while the rows stay pinned to the top and bottom edges. */
 #preview {
     width: 60%;
     border: round $primary;
     border-title-color: $accent;
     border-title-style: bold;
     padding: 0 1;
+    align-horizontal: right;
 }
 
 #preview_nav {
+    dock: top;
     height: auto;
     align: center middle;
 }
@@ -47,22 +56,27 @@
     text-align: center;
 }
 
-/* The rendered page image is contained within the pane, centred, with its
- * aspect ratio preserved. textual-image distorts the image only when *both*
- * width and height are pinned (it scales to fill that exact cell box); with
- * both `auto` its sizing logic derives the height from the width via the source
- * ratio and clamps both to the pane, so the page keeps its proportions and is
- * letterboxed rather than stretched. `align`/`content-align` keep the contained
- * image centred in the leftover space. */
+/* The rendered page is *contained* within the pane preserving its real
+ * proportions: `width: auto` + `height: auto` lets textual-image fit the source
+ * to whichever pane dimension binds first — tall pages fill the height (leaving
+ * horizontal slack), wide/Letter pages fill the width (leaving vertical slack).
+ * This is "fit within the pane", NOT a guaranteed full-height; a wide page is
+ * shorter than the pane and that's correct. Pinning *both* dimensions (e.g.
+ * `height: 1fr` with `width: auto`) is what distorts the page — textual-image
+ * clamps the width to the pane but doesn't scale the height back down, so
+ * anything wider than the pane's cell ratio gets stretched to the full box.
+ * Keeping both `auto` is the UTILS-11/#36 fix; never pin either dimension.
+ * Docking the nav and message (above/below) makes this image the pane's only
+ * in-flow child, so `align-horizontal: right` on #preview can push it flush
+ * against the pane's right edge on its own. */
 #preview_image {
     width: auto;
     height: auto;
-    align: center middle;
-    content-align: center middle;
 }
 
 /* Loading / "Preview unavailable" line under the image. */
 #preview_message {
+    dock: bottom;
     height: auto;
     content-align: center middle;
     text-align: center;

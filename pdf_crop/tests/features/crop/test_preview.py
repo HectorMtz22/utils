@@ -341,3 +341,141 @@ async def test_preview_image_is_contained_not_stretched(three_page_pdf, monkeypa
         # Contained, not stretched: a tall page can't fill the pane width without
         # distortion, so the displayed image is strictly narrower than the pane.
         assert image_width < pane_width
+
+
+# --- preview contains the page (fill height for tall, fit width for wide),
+# --- and sits flush-right (UTILS-13) -----------------------------------------
+#
+# These guards assert the layout the CSS produces, not a pixel-accurate render:
+# textual-image's headless cell geometry is deterministic under pytest (a
+# non-tty gives a fixed `get_cell_size`), so the widget *regions* it lays out
+# are stable and measurable. What a human still has to eyeball is whether the
+# rendered glyphs *look* right in a real terminal — these tests only pin the
+# geometry that drives that.
+#
+# The CSS is `#preview_image { width: auto; height: auto; }`: textual-image
+# *contains* the page within the pane preserving aspect. A tall page is bound by
+# the available height (fills the band, leaves horizontal slack); a wide page is
+# bound by the width (fills the width, leaves vertical slack). Pinning a
+# dimension (`height: 1fr`) is what distorts wide pages — see the wide-page
+# guard below.
+
+
+async def test_preview_image_tall_page_fills_band_without_overflow(
+    three_page_pdf, monkeypatch
+):
+    # A tall portrait page is height-bound: contained within the pane it fills
+    # the band between the (docked) nav row and (docked) message line, leaving
+    # only horizontal slack. We assert the image and message both stay inside the
+    # pane (no overflow) and the image spans the full nav-bottom..message-top
+    # band, proving it fills the available height rather than collapsing to a
+    # sliver. (Measured: a 1:4 page lays out exactly to the band — height ==
+    # message.y - nav.bottom — under `height: auto`, same as it did under the old
+    # `height: 1fr`, because for a tall page the height is the binding dimension
+    # either way.)
+    from pdf_crop.app import PdfCropApp
+    from textual_image.widget import Image as ImageWidget
+
+    # 1:4, much taller than wide, so the height is the binding dimension and a
+    # contained fit fills the band exactly.
+    portrait = Image.new("RGB", (400, 1600), "white")
+
+    def fake_render(self, page_number):
+        return portrait
+
+    monkeypatch.setattr(PagePreview, "_render_page_image", fake_render)
+
+    app = PdfCropApp(three_page_pdf)
+    async with app.run_test(size=(120, 60)) as pilot:
+        preview = app.screen.query_one(PagePreview)
+        await _settle_renders(app, pilot)
+        await pilot.pause()
+
+        image = preview.query_one("#preview_image", ImageWidget)
+        nav = preview.query_one("#preview_nav")
+        message = preview.query_one("#preview_message")
+        pane = preview.content_region
+        # Contained: neither the image nor the message overruns the pane bottom.
+        assert image.region.bottom <= pane.bottom
+        assert message.region.bottom <= pane.bottom
+        # Fills the band: the image spans nav-bottom..message-top, so it's
+        # filling the available height rather than collapsed to a sliver.
+        assert image.region.height == message.region.y - nav.region.bottom
+        assert image.region.height > 1
+
+
+async def test_preview_image_wide_page_preserves_aspect(three_page_pdf, monkeypatch):
+    # The regression guard for the #36 squish under a pinned height: a *wide*
+    # (landscape) page must be contained preserving aspect, NOT stretched to the
+    # full band. With `width: auto; height: auto` textual-image fits a wide page
+    # to the pane *width* and lets the height shrink, leaving vertical slack — so
+    # the image's region height is strictly less than the available band and its
+    # width fills the pane's inner width. Under the buggy `height: 1fr` (with
+    # `width: auto`) textual-image clamps the width to the pane but pins the
+    # height to the whole 1fr band, distorting the page to the full box — this
+    # assertion fails there (region height == band, not < band). Measured at
+    # size=(120, 60): wide page region is 68w x 8h vs an available band of 48
+    # under `auto` (passes), and 68w x 48h under `1fr` (fails).
+    from pdf_crop.app import PdfCropApp
+    from textual_image.widget import Image as ImageWidget
+
+    # 4:1 landscape, ratio 4.0 — far wider than the pane's cell ratio, so a
+    # contained fit must leave vertical slack.
+    landscape = Image.new("RGB", (1600, 400), "white")
+
+    def fake_render(self, page_number):
+        return landscape
+
+    monkeypatch.setattr(PagePreview, "_render_page_image", fake_render)
+
+    app = PdfCropApp(three_page_pdf)
+    async with app.run_test(size=(120, 60)) as pilot:
+        preview = app.screen.query_one(PagePreview)
+        await _settle_renders(app, pilot)
+        await pilot.pause()
+
+        image = preview.query_one("#preview_image", ImageWidget)
+        nav = preview.query_one("#preview_nav")
+        message = preview.query_one("#preview_message")
+        pane = preview.content_region
+        band = message.region.y - nav.region.bottom
+        # Sanity: the widget was actually laid out (non-zero), so the assertions
+        # aren't vacuously true on a collapsed 0x0 widget.
+        assert band > 1 and image.region.height > 0
+        # Contained, not stretched: a wide page fits to width and leaves vertical
+        # slack, so its region height is strictly less than the full band. Under
+        # `height: 1fr` it was pinned to the whole band (height == band).
+        assert image.region.height < band
+        # Fit to width: the image fills the pane's inner content width.
+        assert image.content_size.width == preview.content_size.width
+        # Still inside the pane (no overflow past the bottom).
+        assert image.region.bottom <= pane.bottom
+
+
+async def test_preview_image_is_flush_right(three_page_pdf, monkeypatch):
+    # The image sits against the pane's inner right edge (not centred/left): its
+    # right edge meets the pane's inner right, and — being narrower than the pane
+    # (a portrait page can't fill the width without distortion) — it has a
+    # positive left offset, i.e. it was pushed right.
+    from pdf_crop.app import PdfCropApp
+    from textual_image.widget import Image as ImageWidget
+
+    portrait = Image.new("RGB", (400, 1600), "white")
+
+    def fake_render(self, page_number):
+        return portrait
+
+    monkeypatch.setattr(PagePreview, "_render_page_image", fake_render)
+
+    app = PdfCropApp(three_page_pdf)
+    async with app.run_test(size=(120, 60)) as pilot:
+        preview = app.screen.query_one(PagePreview)
+        await _settle_renders(app, pilot)
+        await pilot.pause()
+
+        image = preview.query_one("#preview_image", ImageWidget)
+        pane = preview.content_region
+        # Flush against the pane's inner right edge.
+        assert image.region.right == pane.right
+        # Pushed right, not centred or left: there is empty space on the left.
+        assert image.region.x - pane.x > 0
