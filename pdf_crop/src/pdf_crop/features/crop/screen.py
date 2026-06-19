@@ -32,6 +32,7 @@ class HelpScreen(ModalScreen):
                 "c / enter    Crop",
                 "← / h        Previous page",
                 "→ / l        Next page",
+                "z            Toggle zoom (Fit / 100%)",
                 "? / f1       Toggle this help",
                 "q / esc      Quit",
             ),
@@ -52,6 +53,7 @@ class CropScreen(Screen):
         Binding("enter", "crop", "Crop", show=False),
         Binding("left,h", "prev_page", "Prev page", show=False),
         Binding("right,l", "next_page", "Next page", show=False),
+        Binding("z", "toggle_zoom", "Zoom", show=False),
         Binding("question_mark,f1", "help", "Help"),
         Binding("q,escape", "quit", "Quit"),
     ]
@@ -230,6 +232,8 @@ class CropScreen(Screen):
             self.query_one(PagePreview).prev()
         elif event.button.id == "next_btn":
             self.query_one(PagePreview).next()
+        elif event.button.id == "zoom_btn":
+            self.query_one(PagePreview).toggle_zoom()
 
     # --- actions (keybindings) ------------------------------------------------
 
@@ -248,6 +252,10 @@ class CropScreen(Screen):
     def action_next_page(self) -> None:
         if not self._input_focused():
             self.query_one(PagePreview).next()
+
+    def action_toggle_zoom(self) -> None:
+        if not self._input_focused():
+            self.query_one(PagePreview).toggle_zoom()
 
     def action_help(self) -> None:
         self.app.push_screen(HelpScreen())
