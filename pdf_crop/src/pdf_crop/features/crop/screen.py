@@ -47,6 +47,10 @@ class CropScreen(Screen):
 
     CSS_PATH = "screen.tcss"
 
+    # Toggling one of these scan-category checkboxes invalidates the scan preview,
+    # so it (and only it) clears the "Found: …" summary and resets "Apply redaction".
+    _CATEGORY_CHECKBOX_IDS = {"cat_clabe_chk", "cat_card_chk", "cat_rfccurp_chk", "cat_name_chk"}
+
     BINDINGS = [
         Binding("s", "scan", "Scan", show=False),
         Binding("c", "crop", "Crop", show=False),
@@ -216,7 +220,7 @@ class CropScreen(Screen):
             error_msg.update(f"[red]{e}[/red]")
 
     def on_checkbox_changed(self, event: Checkbox.Changed) -> None:
-        if event.checkbox.id != "apply_redaction_chk":
+        if event.checkbox.id in self._CATEGORY_CHECKBOX_IDS:
             self._reset_preview()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
