@@ -138,6 +138,52 @@ async def test_scan_no_matches_keeps_apply_disabled(text_pdf_factory):
         assert "nothing to redact" in str(screen.query_one("#preview_msg").content)
 
 
+async def test_apply_redaction_survives_independent_toggles(text_pdf_factory):
+    # Toggling the non-scan checkboxes (QR/OCR/sanitize) must not silently
+    # un-check or re-disable an already-enabled "Apply redaction" — those toggles
+    # don't invalidate the scan preview. Regression for the deselect bug.
+    src = text_pdf_factory(["CLABE 002010077777777771 fin"])
+    app = PdfCropApp(src)
+    async with app.run_test(size=(120, 60)) as pilot:
+        screen = app.screen
+        screen.query_one("#range_input").value = "1"
+        screen.query_one("#cat_clabe_chk").value = True
+        await pilot.pause()
+        await pilot.click("#scan_btn")
+        await app.workers.wait_for_complete()
+        await pilot.pause()
+        apply_chk = screen.query_one("#apply_redaction_chk")
+        assert apply_chk.disabled is False
+        apply_chk.value = True
+        for chk_id in ("#redact_qr_chk", "#ocr_chk", "#sanitize_chk"):
+            screen.query_one(chk_id).value = True
+            await pilot.pause()
+            assert apply_chk.value is True
+            assert apply_chk.disabled is False
+
+
+async def test_category_toggle_still_resets_apply(text_pdf_factory):
+    # Toggling a scan-category checkbox *does* invalidate the preview, so it still
+    # clears the "Found: …" summary and resets "Apply redaction".
+    src = text_pdf_factory(["CLABE 002010077777777771 fin"])
+    app = PdfCropApp(src)
+    async with app.run_test(size=(120, 60)) as pilot:
+        screen = app.screen
+        screen.query_one("#range_input").value = "1"
+        screen.query_one("#cat_clabe_chk").value = True
+        await pilot.pause()
+        await pilot.click("#scan_btn")
+        await app.workers.wait_for_complete()
+        await pilot.pause()
+        apply_chk = screen.query_one("#apply_redaction_chk")
+        apply_chk.value = True
+        screen.query_one("#cat_card_chk").value = True
+        await pilot.pause()
+        assert apply_chk.value is False
+        assert apply_chk.disabled is True
+        assert str(screen.query_one("#preview_msg").content) == ""
+
+
 @zbar_skip.SKIP
 async def test_scan_lists_found_qr_codes(qr_pdf_factory):
     src = qr_pdf_factory(["CLABE002010077777777771"])
