@@ -1,6 +1,7 @@
 import pytest
 
-from pdf_crop.features.crop.command import run, _redact_qr_in_place, _redact_ocr_in_place
+from pdf_crop.features.crop.command import run
+from pdf_crop.features.crop.service import _redact_qr_chain, _redact_ocr_chain
 from pdf_crop.features.qr_redact import service as qr_service
 from pdf_crop.features.ocr_redact import service as ocr_service
 from pdf_crop.shared.errors import PdfCropError
@@ -76,7 +77,7 @@ def test_redact_qr_cleans_up_temp_on_redact_failure(ten_page_pdf, monkeypatch):
     monkeypatch.setattr(qr_service, "redact", fake_redact)
 
     with pytest.raises(PdfCropError):
-        _redact_qr_in_place(dest)
+        _redact_qr_chain(dest)
 
     assert not tmp.exists()
     assert dest.read_bytes() == original
@@ -92,7 +93,7 @@ def test_redact_qr_translates_imaging_error_to_pdfcroperror(ten_page_pdf, monkey
     monkeypatch.setattr(qr_service, "redact", fake_redact)
 
     with pytest.raises(PdfCropError):
-        _redact_qr_in_place(ten_page_pdf)
+        _redact_qr_chain(ten_page_pdf)
 
 
 def test_run_with_redact_qr_returns_2_on_second_pass_error(ten_page_pdf, monkeypatch, capsys):
@@ -133,7 +134,7 @@ def test_redact_ocr_cleans_up_temp_on_redact_failure(ten_page_pdf, monkeypatch):
     monkeypatch.setattr(ocr_service, "redact", fake_redact)
 
     with pytest.raises(PdfCropError):
-        _redact_ocr_in_place(dest, categories=CATS, names=[])
+        _redact_ocr_chain(dest, categories=CATS, names=[])
 
     assert not tmp.exists()
     assert dest.read_bytes() == original
@@ -147,7 +148,7 @@ def test_redact_ocr_translates_tesseract_error_to_pdfcroperror(ten_page_pdf, mon
     monkeypatch.setattr(ocr_service, "scan", boom)
 
     with pytest.raises(PdfCropError):
-        _redact_ocr_in_place(ten_page_pdf, categories=CATS, names=[])
+        _redact_ocr_chain(ten_page_pdf, categories=CATS, names=[])
 
 
 def test_run_with_ocr_returns_2_on_second_pass_error(ten_page_pdf, monkeypatch, capsys):
@@ -172,8 +173,8 @@ def test_redact_ocr_skips_when_no_effective_category(ten_page_pdf, monkeypatch):
 
     monkeypatch.setattr(ocr_service, "scan", fail)
 
-    assert _redact_ocr_in_place(ten_page_pdf, categories=set(), names=[]) == 0
-    assert _redact_ocr_in_place(ten_page_pdf, categories={"name"}, names=[]) == 0
+    assert _redact_ocr_chain(ten_page_pdf, categories=set(), names=[]) == 0
+    assert _redact_ocr_chain(ten_page_pdf, categories={"name"}, names=[]) == 0
 
 
 def test_run_passes_sanitize_through(pdf_with_metadata, capsys):

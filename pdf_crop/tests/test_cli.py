@@ -52,17 +52,22 @@ def test_cli_redact_qr_flag_removes_qr_from_output(qr_pdf_factory, capsys):
 
 def test_cli_ocr_flag_runs_second_pass(ten_page_pdf, monkeypatch, capsys):
     """`--ocr` triggers the OCR second pass over the written output with the
-    automatic categories (no per-category flags in the CLI)."""
-    from pdf_crop.features.crop import command
+    automatic categories (no per-category flags in the CLI).
+
+    Post-UTILS-18 the OCR pass runs inside the crop orchestrator (fitz-first,
+    pypdf-last) via `_redact_ocr_chain`, so spy there rather than on the old
+    `command._redact_ocr_in_place` in-place helper.
+    """
+    from pdf_crop.features.crop import service as crop_service
 
     calls = {}
 
-    def fake_ocr(dest, *, categories, names):
+    def fake_ocr(path, *, categories, names):
         calls["categories"] = categories
         calls["names"] = names
         return 0
 
-    monkeypatch.setattr(command, "_redact_ocr_in_place", fake_ocr)
+    monkeypatch.setattr(crop_service, "_redact_ocr_chain", fake_ocr)
 
     rc = main([str(ten_page_pdf), "1-2", "--ocr"])
     assert rc == 0

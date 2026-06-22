@@ -7,7 +7,7 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen, Screen
 from textual.widgets import Button, Checkbox, Footer, Header, Input, Static
 
-from pdf_crop.features.crop import command
+from pdf_crop.features.crop import service as crop_service
 from pdf_crop.features.crop.preview import PagePreview
 from pdf_crop.features.redact import service as redact_service
 from pdf_crop.features.redact import text_layer
@@ -366,30 +366,32 @@ class CropScreen(Screen):
     ) -> None:
         try:
             dest = output_path.resolve(self.src)
-            writer = pdf_io.build_subset(self.reader, pages, sanitize=sanitize)
-            redacted = 0
-            if apply_redaction and self._findings is not None:
-                redacted = redact_service.redact(
-                    writer, categories=categories, names=names
-                )
-            with dest.open("wb") as f:
-                writer.write(f)
-            qr_removed = command._redact_qr_in_place(dest) if redact_qr else 0
-            ocr_removed = (
-                command._redact_ocr_in_place(dest, categories=categories, names=names)
-                if ocr
-                else 0
+            # Reorder (UTILS-18): the shared orchestrator runs the fitz phase on
+            # the original and finalizes with pypdf, so fitz never re-reads
+            # pypdf's output. It also guards the final page count.
+            counts = crop_service.crop(
+                self.reader,
+                self.src,
+                pages,
+                dest,
+                sanitize=sanitize,
+                apply_redaction=apply_redaction and self._findings is not None,
+                redact_qr=redact_qr,
+                ocr=ocr,
+                categories=categories,
+                names=names,
+                redactor=redact_service.redact,
             )
         except PdfCropError as e:
             self.app.call_from_thread(self._crop_error, str(e))
             return
         notes = []
-        if redacted:
-            notes.append(f"redacted {redacted} items")
-        if qr_removed:
-            notes.append(f"{qr_removed} QR/barcodes")
-        if ocr_removed:
-            notes.append(f"{ocr_removed} OCR items")
+        if counts["redacted"]:
+            notes.append(f"redacted {counts['redacted']} items")
+        if counts["qr_removed"]:
+            notes.append(f"{counts['qr_removed']} QR/barcodes")
+        if counts["ocr_removed"]:
+            notes.append(f"{counts['ocr_removed']} OCR items")
         suffix = f" ({', '.join(notes)})" if notes else ""
         self.app.call_from_thread(self._crop_done, f"Wrote {dest}{suffix}")
 

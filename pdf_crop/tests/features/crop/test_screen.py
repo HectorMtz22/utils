@@ -232,19 +232,21 @@ async def test_crop_shows_error_on_qr_second_pass_failure(text_pdf_factory, monk
 
 
 async def test_crop_runs_ocr_second_pass_with_selected_categories(text_pdf_factory, monkeypatch):
-    # When #ocr_chk is ticked, the OCR second pass runs over the written file
-    # using the selected category checkboxes + names input.
-    from pdf_crop.features.crop import command
+    # When #ocr_chk is ticked, the OCR second pass runs using the selected
+    # category checkboxes + names input. Post-UTILS-18 the OCR pass runs inside
+    # the crop orchestrator (fitz-first, pypdf-last) via `_redact_ocr_chain`, so
+    # spy there rather than on the old `command._redact_ocr_in_place` helper.
+    from pdf_crop.features.crop import service as crop_service
 
     calls = {}
 
-    def fake_ocr(dest, *, categories, names):
-        calls["dest"] = dest
+    def fake_ocr(path, *, categories, names):
+        calls["path"] = path
         calls["categories"] = categories
         calls["names"] = names
         return 0
 
-    monkeypatch.setattr(command, "_redact_ocr_in_place", fake_ocr)
+    monkeypatch.setattr(crop_service, "_redact_ocr_chain", fake_ocr)
 
     src = text_pdf_factory(["some text"])
     app = PdfCropApp(src)
