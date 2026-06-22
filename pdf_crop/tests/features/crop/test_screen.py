@@ -36,10 +36,10 @@ async def test_crop_button_reachable_in_short_terminal(three_page_pdf):
 
 @pytest.mark.parametrize("size", [(120, 40), (200, 60)])
 async def test_action_buttons_not_clipped_by_footer(three_page_pdf, size):
-    # The Crop/Cancel buttons are 3 rows tall and live in the bottom action bar.
-    # They must sit *above* the Footer, fully visible — not have their bottom row
-    # hidden behind the footer (which also docks bottom). Regression for the
-    # dock-edge collision that clipped the last button row off-screen.
+    # The Crop/Cancel buttons live in the bottom action bar. They must sit *above*
+    # the Footer, fully visible — not have their bottom row hidden behind the
+    # footer (which also docks bottom). Regression for the dock-edge collision
+    # that clipped the last button row off-screen.
     from textual.widgets import Footer
 
     app = PdfCropApp(three_page_pdf)
@@ -421,18 +421,73 @@ async def test_z_in_input_does_not_toggle_zoom(three_page_pdf):
         assert "z" in screen.query_one("#names_input").value
 
 
+async def test_zoom_button_lives_in_action_bar_not_nav(three_page_pdf):
+    # UTILS-16: the zoom toggle moved from the cramped preview nav row to the
+    # bottom action bar (next to Crop/Cancel). Assert the new home and the move.
+    from pdf_crop.features.crop.preview import PagePreview
+
+    app = PdfCropApp(three_page_pdf)
+    async with app.run_test(size=(120, 60)) as pilot:
+        screen = app.screen
+        preview = screen.query_one(PagePreview)
+        # Found in the action buttons row, and no longer inside the preview nav.
+        assert screen.query_one("#action_buttons #zoom_btn") is not None
+        assert not preview.query("#preview_nav #zoom_btn")
+        assert not preview.query("#zoom_btn")  # not anywhere inside the pane
+
+
 async def test_zoom_button_toggles_preview_zoom(three_page_pdf):
-    # The nav-row toggle button flips the mode and shows the mode you'd switch to.
+    # The action-bar toggle button flips the mode and shows the mode you'd switch
+    # to. The button now lives in the screen's action bar, not the preview pane.
     from pdf_crop.features.crop.preview import FIT, NATIVE, PagePreview
 
     app = PdfCropApp(three_page_pdf)
     async with app.run_test(size=(120, 60)) as pilot:
-        preview = app.screen.query_one(PagePreview)
+        screen = app.screen
+        preview = screen.query_one(PagePreview)
         assert preview.mode == FIT
-        assert str(preview.query_one("#zoom_btn").label) == "100%"
+        assert str(screen.query_one("#zoom_btn").label) == "100%"
         await pilot.click("#zoom_btn")
         assert preview.mode == NATIVE
-        assert str(preview.query_one("#zoom_btn").label) == "Fit"
+        assert str(screen.query_one("#zoom_btn").label) == "Fit"
+
+
+async def test_z_key_updates_relocated_zoom_button_label(three_page_pdf):
+    # The `z` key flips the mode and the relocated (action-bar) button's label
+    # tracks it, so the screen-scoped watch_mode label sync is exercised.
+    from pdf_crop.features.crop.preview import FIT, NATIVE, PagePreview
+
+    app = PdfCropApp(three_page_pdf)
+    async with app.run_test(size=(120, 60)) as pilot:
+        screen = app.screen
+        preview = screen.query_one(PagePreview)
+        assert preview.mode == FIT
+        assert str(screen.query_one("#zoom_btn").label) == "100%"
+        await pilot.press("z")
+        assert preview.mode == NATIVE
+        assert str(screen.query_one("#zoom_btn").label) == "Fit"
+        await pilot.press("z")
+        assert preview.mode == FIT
+        assert str(screen.query_one("#zoom_btn").label) == "100%"
+
+
+async def test_all_buttons_are_compact_single_row(three_page_pdf):
+    # UTILS-16: EVERY button on the screen is compacted to a single row of text
+    # (height 1) instead of the default 3-row bordered box — one consistent style
+    # across the action bar, the preview nav, and the left-pane controls.
+    app = PdfCropApp(three_page_pdf)
+    async with app.run_test(size=(120, 60)) as pilot:
+        screen = app.screen
+        for button_id in (
+            "crop_btn",
+            "cancel_btn",
+            "zoom_btn",
+            "prev_btn",
+            "next_btn",
+            "scan_btn",
+            "list_metadata_btn",
+        ):
+            assert screen.query_one(f"#{button_id}").region.height == 1, button_id
 
 
 async def test_typing_in_input_does_not_trigger_crop(three_page_pdf):

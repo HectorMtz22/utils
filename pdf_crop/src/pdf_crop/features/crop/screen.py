@@ -86,6 +86,11 @@ class CropScreen(Screen):
             with Horizontal(id="action_buttons"):
                 yield Button("Crop", id="crop_btn", variant="primary")
                 yield Button("Cancel", id="cancel_btn")
+                # Fit/100% zoom toggle (UTILS-16): moved out of the cramped
+                # preview nav row into the action bar. Starts in Fit mode, so the
+                # caption shows the mode you'd switch *to* ("100%") — matching
+                # PagePreview._zoom_label(), which watch_mode keeps in sync.
+                yield Button("100%", id="zoom_btn")
         yield Footer()
 
     def _pages_section(self) -> Vertical:

@@ -112,6 +112,20 @@
     margin-right: 2;
 }
 
+/* Compact buttons (UTILS-16): every button on this screen — the nav
+ * (< prev / next >), the left-pane Scan / List metadata, and the action bar
+ * (Crop / Cancel / Fit) — renders as a single row of text instead of the
+ * default 3-row bordered box, for one consistent compact style across the
+ * screen (no row crams or wraps). `border: none` drops the box outline (Crop's
+ * primary highlight is a *background*, so it survives); height/min-height pin
+ * the single row; the tight horizontal padding trims the wide default gutter. */
+Button {
+    height: 1;
+    min-height: 1;
+    border: none;
+    padding: 0 1;
+}
+
 /* Help overlay. */
 HelpScreen {
     align: center middle;
