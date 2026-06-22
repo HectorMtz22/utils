@@ -71,7 +71,6 @@ class PagePreview(Vertical):
         with Horizontal(id="preview_nav"):
             yield Button("< prev", id="prev_btn")
             yield Static("", id="preview_status")
-            yield Button(self._zoom_label(), id="zoom_btn")
             yield Button("next >", id="next_btn")
         # The image lives in a scroll container so a page larger than the pane
         # (always, in 100% mode; a tall page even in Fit) can be panned with the
@@ -110,11 +109,14 @@ class PagePreview(Vertical):
 
     def watch_mode(self) -> None:
         # Re-size the currently shown image to the new mode and update the
-        # toggle's caption. Guarded on mount: `mode` may be set before compose.
+        # toggle's caption. The toggle button now lives in the screen's action
+        # bar (UTILS-16), not inside this pane, so look it up via `self.screen`.
+        # Guarded: `mode` may be set before mount, and standalone-widget tests
+        # have no screen / no zoom_btn.
         try:
-            self.query_one("#zoom_btn", Button).label = self._zoom_label()
+            self.screen.query_one("#zoom_btn", Button).label = self._zoom_label()
         except Exception:
-            return  # not mounted yet
+            pass  # not mounted yet, or no zoom button (standalone widget)
         if self._current_image is not None:
             self._apply_mode_sizing(self._current_image)
 
