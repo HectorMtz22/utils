@@ -96,3 +96,46 @@ def test_scan_records_skipped_pages_on_parse_error(text_pdf_factory, monkeypatch
     findings = service.scan(reader, [1, 2], categories={"clabe"}, names=[])
     assert findings.skipped_pages == [2]
     assert findings.summary() == {"clabe": 1}  # page 1 still processed
+
+
+def test_redact_keeps_image_layer_and_does_not_blank_page(tmp_path):
+    # Regression (UTILS-18): on a page with a background image + a real text
+    # layer (a scanned/templated statement), redacting a text match must remove
+    # only that text and leave the page intact. The old direct `/Contents`
+    # assignment produced a malformed, fully-blank page (MuPDF "syntax error in
+    # dict"); replace_contents() writes a valid indirect stream instead.
+    import fitz
+    from pypdf import PdfWriter
+
+    src = tmp_path / "image_plus_text.pdf"
+    doc = fitz.open()
+    page = doc.new_page(width=420, height=595)
+    pm = fitz.Pixmap(fitz.csRGB, fitz.IRect(0, 0, 420, 595))
+    pm.set_rect(pm.irect, (0, 80, 180))  # full-page (blue) background image
+    page.insert_image(page.rect, pixmap=pm)
+    page.insert_text((60, 300), "CLABE 002010077777777771", color=(1, 1, 1))
+    doc.save(str(src))
+    doc.close()
+
+    reader = open_pdf(src)
+    writer = PdfWriter()
+    writer.add_page(reader.pages[0])
+    service.redact(writer, categories={"clabe"}, names=[])
+
+    out = tmp_path / "redacted.pdf"
+    with out.open("wb") as f:
+        writer.write(f)
+
+    # The page still renders with its background — not a blank/corrupt page.
+    rendered = fitz.open(str(out))
+    pix = rendered[0].get_pixmap(dpi=40)
+    samples = pix.samples
+    nonwhite = sum(
+        1 for i in range(0, len(samples), pix.n) if samples[i : i + 3] != b"\xff\xff\xff"
+    )
+    fraction = nonwhite / (pix.width * pix.height)
+    rendered.close()
+    assert fraction > 0.5, f"page rendered nearly blank ({fraction:.2f}) — over-redacted"
+
+    # ...and the sensitive text is gone.
+    assert "002010077777777771" not in open_pdf(out).pages[0].extract_text()

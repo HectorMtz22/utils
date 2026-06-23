@@ -1,7 +1,6 @@
 from pypdf.generic import (
     ByteStringObject,
     ContentStream,
-    NameObject,
     TextStringObject,
 )
 
@@ -72,9 +71,13 @@ def delete_spans(page, spans):
             operands[0][el_index] = TextStringObject(_strip(str(operands[0][el_index]), offsets))
         cs.operations[op_index] = (operands, operator)
 
-    # Assign directly to avoid a deprecation warning that fires when
-    # replace_contents() detects the page is still attached to a reader.
-    page[NameObject("/Contents")] = cs
+    # Replace via the page API so /Contents is written as a proper *indirect*
+    # stream. A direct `page["/Contents"] = cs` assignment produces a malformed
+    # page on anything with an image layer (e.g. a scanned/templated statement):
+    # the page renders blank and MuPDF reports "syntax error in dict". The
+    # reader-attached deprecation warning the old hack avoided doesn't fire here
+    # — redaction runs on writer pages.
+    page.replace_contents(cs)
 
 
 def _strip(s, offsets):
