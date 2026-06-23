@@ -41,6 +41,30 @@ _ACCOUNT_RE = re.compile(
 )
 
 
+# Mexican addresses (UTILS-20). Precision over recall: anchor on strong cues and
+# bound matches to a single line — never redact whole multi-line blocks.
+#
+# Postal code: the 5-digit code only matches when anchored on a "C.P." / "CP"
+# cue (case-insensitive, dots optional). A bare 5-digit number with no cue is NOT
+# matched. The gap between the cue letters and the code is bounded to a couple of
+# literal spaces (no newlines / runaway whitespace). Span covers the cue + code.
+_CP_RE = re.compile(r"(?<!\w)c\.?[ ]{0,2}p\.?[ ]{0,2}\d{5}(?!\d)")
+#
+# Street lines: anchored on strong street cues only. "No." / "Núm." / "#" are too
+# generic to stand alone (they appear in "No. de operación", "No. de cuenta",
+# "pedido # 7"), so they are NOT cues — a house number like "No. 123" is covered
+# naturally when it sits on a line already opened by a strong cue. The cue must be
+# at a word boundary (so "desavenida"/"encalle" don't match). Crucially these cues
+# are also ordinary Spanish nouns ("la calle principal", "la avenida"), so a match
+# additionally REQUIRES a digit later on the same line — MX street addresses carry
+# a house number / CP, ordinary prose usually does not. Redact from the cue to end
+# of line ([^\n]*), never across paragraphs. Run on accent/case-folded text.
+_STREET_RE = re.compile(
+    r"(?<!\w)(?:calle|avenida|av|blvd|boulevard|calz|calzada|col|colonia)"
+    r"\.?(?=\s)[^\n]*\d[^\n]*"
+)
+
+
 @dataclass(frozen=True)
 class Match:
     category: str
@@ -127,6 +151,25 @@ def detect(text, *, categories, names):
             matches.append(
                 Match("account", orig_start, orig_end, text[orig_start:orig_end])
             )
+
+    if "address" in categories:
+        # Anchored postal codes (C.P./CP cue) and strong street-cue lines, both
+        # bounded to a single line. Run on accent/case-folded text, then map each
+        # span back to the original. `_merge` collapses a street line that also
+        # carries a C.P. into one match.
+        folded_text, text_idx_map = _fold_with_map(text)
+
+        def _add_address(fstart, fend):
+            orig_start = text_idx_map[fstart]
+            orig_end = text_idx_map[fend - 1] + 1
+            matches.append(
+                Match("address", orig_start, orig_end, text[orig_start:orig_end])
+            )
+
+        for am in _CP_RE.finditer(folded_text):
+            _add_address(am.start(), am.end())
+        for am in _STREET_RE.finditer(folded_text):
+            _add_address(am.start(), am.end())
 
     if "card" in categories:
         for m in _CARD_RE.finditer(text):

@@ -348,6 +348,19 @@ async def test_account_checkbox_feeds_selected_categories(text_pdf_factory):
         assert "account" in screen._selected_categories()
 
 
+async def test_address_checkbox_feeds_selected_categories(text_pdf_factory):
+    # UTILS-20: ticking "Redact: Addresses" puts "address" in the selected
+    # category set that scan/crop pass through to the detectors.
+    src = text_pdf_factory(["Calle Reforma 123, C.P. 64000"])
+    app = PdfCropApp(src)
+    async with app.run_test(size=(120, 60)) as pilot:
+        screen = app.screen
+        assert "address" not in screen._selected_categories()
+        screen.query_one("#cat_address_chk").value = True
+        await pilot.pause()
+        assert "address" in screen._selected_categories()
+
+
 async def test_screen_has_three_labeled_sections(three_page_pdf):
     app = PdfCropApp(three_page_pdf)
     async with app.run_test(size=(120, 60)) as pilot:
