@@ -19,6 +19,11 @@ def test_ocr_cli_categories_includes_account():
     assert "account" in OCR_CLI_CATEGORIES
 
 
+def test_ocr_cli_categories_includes_address():
+    # UTILS-20: the CLI OCR pass scans Mexican addresses (CP + street lines) too.
+    assert "address" in OCR_CLI_CATEGORIES
+
+
 def test_direct_mode_writes_cropped_file(ten_page_pdf, capsys):
     rc = run(ten_page_pdf, "1-3,5")
     assert rc == 0

@@ -9,7 +9,7 @@ from .service import crop_pdf
 
 # Categories the OCR pass scans by default from the CLI. `name` needs a names
 # list the CLI can't provide, so it's omitted there (the TUI passes its own).
-OCR_CLI_CATEGORIES = {"clabe", "account", "card", "rfc", "curp"}
+OCR_CLI_CATEGORIES = {"clabe", "account", "card", "rfc", "curp", "address"}
 
 
 def run(

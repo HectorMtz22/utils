@@ -54,6 +54,7 @@ class CropScreen(Screen):
         "cat_account_chk",
         "cat_card_chk",
         "cat_rfccurp_chk",
+        "cat_address_chk",
         "cat_name_chk",
     }
 
@@ -117,6 +118,7 @@ class CropScreen(Screen):
             Checkbox("Redact: Account numbers", id="cat_account_chk"),
             Checkbox("Redact: Card numbers", id="cat_card_chk"),
             Checkbox("Redact: RFC/CURP", id="cat_rfccurp_chk"),
+            Checkbox("Redact: Addresses", id="cat_address_chk"),
             Checkbox("Redact: Names", id="cat_name_chk"),
             Input(placeholder="comma-separated names to redact", id="names_input"),
             Button("Scan", id="scan_btn"),
@@ -157,6 +159,8 @@ class CropScreen(Screen):
             cats.add("card")
         if self.query_one("#cat_rfccurp_chk", Checkbox).value:
             cats.update({"rfc", "curp"})
+        if self.query_one("#cat_address_chk", Checkbox).value:
+            cats.add("address")
         if self.query_one("#cat_name_chk", Checkbox).value:
             cats.add("name")
         return cats
