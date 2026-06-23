@@ -47,6 +47,26 @@ def pdf_factory(tmp_path):
 
 
 @pytest.fixture
+def raw_content_stream():
+    """Build a pypdf ContentStream from raw operator bytes.
+
+    raw_content_stream(b"BT /F1 12 Tf ... ET") -> ContentStream, letting tests
+    construct exact operator sequences (Tm tables, TJ kerning) by hand. A blank
+    writer page supplies the `.pdf` context the parser needs.
+    """
+    from pypdf import PdfWriter
+    from pypdf.generic import ContentStream, DecodedStreamObject
+
+    def _factory(raw: bytes):
+        page = PdfWriter().add_blank_page(width=600, height=800)
+        stream = DecodedStreamObject()
+        stream.set_data(raw)
+        return ContentStream(stream, page.pdf)
+
+    return _factory
+
+
+@pytest.fixture
 def three_page_pdf(pdf_factory):
     return pdf_factory("three.pdf", 3)
 
