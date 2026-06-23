@@ -120,7 +120,10 @@ class CropScreen(Screen):
             Checkbox("Redact: RFC/CURP", id="cat_rfccurp_chk"),
             Checkbox("Redact: Addresses", id="cat_address_chk"),
             Checkbox("Redact: Names", id="cat_name_chk"),
-            Input(placeholder="comma-separated names to redact", id="names_input"),
+            Input(
+                placeholder="extra names to redact (labelled names auto-detected)",
+                id="names_input",
+            ),
             Button("Scan", id="scan_btn"),
             Static("", id="preview_msg", classes="found-summary"),
             Checkbox("Apply redaction", id="apply_redaction_chk", disabled=True),
