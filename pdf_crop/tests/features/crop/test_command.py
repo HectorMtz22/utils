@@ -1,12 +1,22 @@
 import pytest
 
-from pdf_crop.features.crop.command import run, _redact_qr_in_place, _redact_ocr_in_place
+from pdf_crop.features.crop.command import (
+    run,
+    OCR_CLI_CATEGORIES,
+    _redact_qr_in_place,
+    _redact_ocr_in_place,
+)
 from pdf_crop.features.qr_redact import service as qr_service
 from pdf_crop.features.ocr_redact import service as ocr_service
 from pdf_crop.shared.errors import PdfCropError
 from pdf_crop.shared.pdf_io import open_pdf, page_count
 
 CATS = {"clabe", "card", "rfc", "curp"}
+
+
+def test_ocr_cli_categories_includes_account():
+    # UTILS-19: the CLI OCR pass scans label-anchored account numbers too.
+    assert "account" in OCR_CLI_CATEGORIES
 
 
 def test_direct_mode_writes_cropped_file(ten_page_pdf, capsys):

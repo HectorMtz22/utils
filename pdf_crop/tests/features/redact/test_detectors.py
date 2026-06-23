@@ -124,3 +124,162 @@ def test_detects_card_all_dash_groups():
     matches = detect("4539-5787-6362-1486", categories={"card"}, names=[])
     assert len(matches) == 1
     assert matches[0].text == "4539-5787-6362-1486"
+
+
+# --- UTILS-19: space-separated CLABE ---------------------------------------
+
+
+def test_detects_space_separated_clabe_and_spans_the_groups():
+    # Statements print the CLABE in groups; the 18 digits are split by single
+    # spaces. The match span must cover the whole grouped run so the spaces are
+    # redacted too (otherwise stray digit-groups leak through).
+    text = "CLABE 012 180 01234567890 1 vigente"
+    matches = detect(text, categories={"clabe"}, names=[])
+    assert len(matches) == 1
+    m = matches[0]
+    assert m.category == "clabe"
+    assert m.text == "012 180 01234567890 1"
+    assert text[m.start:m.end] == "012 180 01234567890 1"
+    # Normalised it is exactly 18 digits.
+    assert len("".join(c for c in m.text if c.isdigit())) == 18
+
+
+def test_contiguous_clabe_still_matches():
+    text = "Cuenta CLABE 002010077777777771 vigente"
+    matches = detect(text, categories={"clabe"}, names=[])
+    assert [m.text for m in matches] == ["002010077777777771"]
+
+
+def test_spaced_run_of_17_or_19_digits_not_clabe():
+    # 17 digits across groups: 3+3+10+1 = 17
+    assert detect("012 180 0123456789 0", categories={"clabe"}, names=[]) == []
+    # 19 digits across groups: 3+3+12+1 = 19
+    assert detect("012 180 012345678901 2", categories={"clabe"}, names=[]) == []
+
+
+def test_spaced_clabe_not_matched_inside_alphanumeric_token():
+    # Boundaries must hold even with the spaced form.
+    assert detect("AB012 180 01234567890 1", categories={"clabe"}, names=[]) == []
+    assert detect("012 180 01234567890 1X", categories={"clabe"}, names=[]) == []
+
+
+def test_spaced_18_digits_without_clabe_cue_not_matched():
+    # A space-separated run is only trusted after a "CLABE" cue; without it, an
+    # 18-digit spaced run must NOT be redacted.
+    assert detect("012 180 01234567890 1 vigente", categories={"clabe"}, names=[]) == []
+
+
+def test_unrelated_digit_groups_totaling_18_not_clabe():
+    # Statement number sequences (refs, folios, phone+amount, dates) often place
+    # several digit groups adjacent; totalling 18 must not become a CLABE.
+    for text in (
+        "Ref 123456789 987654321 end",    # two 9-digit refs = 18
+        "Folio 123456 789012 345678 ok",  # three 6-digit groups = 18
+        "20260615 1234567890",            # date (8) + number (10) = 18
+    ):
+        assert detect(text, categories={"clabe"}, names=[]) == [], text
+
+
+# --- UTILS-19: label-anchored bank account numbers --------------------------
+
+
+def test_detects_account_after_cuenta_label():
+    text = "Cuenta: 0123456789 al corte"
+    matches = detect(text, categories={"account"}, names=[])
+    assert len(matches) == 1
+    m = matches[0]
+    assert m.category == "account"
+    assert m.text == "0123456789"
+
+
+def test_detects_account_after_no_de_cuenta_label():
+    # BBVA-style 10-digit account behind "No. de cuenta".
+    text = "No. de cuenta 0012345678 saldo"
+    matches = detect(text, categories={"account"}, names=[])
+    assert [m.category for m in matches] == ["account"]
+    assert [m.text for m in matches] == ["0012345678"]
+
+
+def test_detects_11_digit_santander_account_after_cta():
+    # Santander accounts run ~11 digits.
+    text = "Cta 01234567890 MXN"
+    matches = detect(text, categories={"account"}, names=[])
+    assert [m.text for m in matches] == ["01234567890"]
+
+
+def test_detects_12_digit_banregio_account_accent_insensitive():
+    # Banregio (and its digital arm Hey Banco) accounts run up to 12 digits;
+    # the cue is accent/case insensitive ("Núm. de cuenta").
+    text = "NÚM. DE CUENTA 012345678901 activa"
+    matches = detect(text, categories={"account"}, names=[])
+    assert [m.text for m in matches] == ["012345678901"]
+
+
+def test_detects_spaced_account_run_and_spans_the_spaces():
+    text = "Cuenta: 0123 456789 saldo"
+    matches = detect(text, categories={"account"}, names=[])
+    assert len(matches) == 1
+    assert matches[0].text == "0123 456789"
+
+
+def test_detects_account_after_cta_with_period():
+    # "Cta." with a trailing period is a very common abbreviation.
+    matches = detect("Cta. 0123456789 saldo", categories={"account"}, names=[])
+    assert [m.text for m in matches] == ["0123456789"]
+
+
+def test_account_cue_cta_not_matched_inside_other_words():
+    # The short cue "cta" must not match as the tail of common Spanish words.
+    assert detect("linea recta 0123456789", categories={"account"}, names=[]) == []
+    assert detect("venta directa 0123456789", categories={"account"}, names=[]) == []
+
+
+# --- UTILS-19: account NEGATIVES (precision over recall) --------------------
+
+
+def test_bare_account_length_number_without_label_not_matched():
+    # A bare 10- or 11-digit run with no account cue must NOT be redacted.
+    assert detect("0123456789 referencia", categories={"account"}, names=[]) == []
+    assert detect("01234567890", categories={"account"}, names=[]) == []
+
+
+def test_amount_or_date_without_label_not_matched_as_account():
+    # Amounts and dates near no cue must not trip the account detector.
+    assert detect("Importe 12,345.67 MXN el 2026-06-15", categories={"account"}, names=[]) == []
+    assert detect("Fecha 15/06/2026 corte", categories={"account"}, names=[]) == []
+
+
+def test_cuenta_clabe_label_yields_clabe_not_account():
+    # "Cuenta CLABE" is the 18-digit CLABE — detector #1, not the account one.
+    text = "Cuenta CLABE 002010077777777771 vigente"
+    matches = detect(text, categories={"clabe", "account"}, names=[])
+    assert len(matches) == 1
+    assert matches[0].category == "clabe"
+    assert matches[0].text == "002010077777777771"
+
+
+def test_16_digit_card_after_cuenta_not_matched_as_account():
+    # A 16-digit card behind a "Cuenta" cue is too long for an account run.
+    text = "Cuenta 4539578763621486"
+    matches = detect(text, categories={"account"}, names=[])
+    assert [m.category for m in matches] == []
+
+
+def test_18_digit_clabe_after_cuenta_not_matched_as_account():
+    text = "Cuenta 002010077777777771"
+    matches = detect(text, categories={"account"}, names=[])
+    assert [m.category for m in matches] == []
+
+
+def test_account_not_returned_when_category_disabled():
+    assert detect("Cuenta: 0123456789", categories=set(), names=[]) == []
+
+
+def test_account_and_clabe_do_not_double_match_same_span():
+    # Even if both categories are on, a single 18-digit CLABE behind "Cuenta CLABE"
+    # is one match, not an account+clabe overlap.
+    text = "Cuenta CLABE 012180012345678901 fin"
+    matches = detect(text, categories={"clabe", "account"}, names=[])
+    spans = sorted((m.start, m.end) for m in matches)
+    for (s1, e1), (s2, e2) in zip(spans, spans[1:]):
+        assert e1 <= s2

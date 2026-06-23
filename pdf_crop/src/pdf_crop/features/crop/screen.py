@@ -49,7 +49,13 @@ class CropScreen(Screen):
 
     # Toggling one of these scan-category checkboxes invalidates the scan preview,
     # so it (and only it) clears the "Found: …" summary and resets "Apply redaction".
-    _CATEGORY_CHECKBOX_IDS = {"cat_clabe_chk", "cat_card_chk", "cat_rfccurp_chk", "cat_name_chk"}
+    _CATEGORY_CHECKBOX_IDS = {
+        "cat_clabe_chk",
+        "cat_account_chk",
+        "cat_card_chk",
+        "cat_rfccurp_chk",
+        "cat_name_chk",
+    }
 
     BINDINGS = [
         Binding("s", "scan", "Scan", show=False),
@@ -108,6 +114,7 @@ class CropScreen(Screen):
     def _redaction_section(self) -> Vertical:
         section = Vertical(
             Checkbox("Redact: CLABE", id="cat_clabe_chk"),
+            Checkbox("Redact: Account numbers", id="cat_account_chk"),
             Checkbox("Redact: Card numbers", id="cat_card_chk"),
             Checkbox("Redact: RFC/CURP", id="cat_rfccurp_chk"),
             Checkbox("Redact: Names", id="cat_name_chk"),
@@ -144,6 +151,8 @@ class CropScreen(Screen):
         cats = set()
         if self.query_one("#cat_clabe_chk", Checkbox).value:
             cats.add("clabe")
+        if self.query_one("#cat_account_chk", Checkbox).value:
+            cats.add("account")
         if self.query_one("#cat_card_chk", Checkbox).value:
             cats.add("card")
         if self.query_one("#cat_rfccurp_chk", Checkbox).value:

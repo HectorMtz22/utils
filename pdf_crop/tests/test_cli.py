@@ -66,7 +66,7 @@ def test_cli_ocr_flag_runs_second_pass(ten_page_pdf, monkeypatch, capsys):
 
     rc = main([str(ten_page_pdf), "1-2", "--ocr"])
     assert rc == 0
-    assert calls["categories"] == {"clabe", "card", "rfc", "curp"}
+    assert calls["categories"] == {"clabe", "account", "card", "rfc", "curp"}
     assert calls["names"] == []
 
 
