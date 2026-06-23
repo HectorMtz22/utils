@@ -335,6 +335,19 @@ async def test_crop_with_redact_qr_removes_qr_from_output(qr_pdf_factory):
     assert decode(img) == []
 
 
+async def test_account_checkbox_feeds_selected_categories(text_pdf_factory):
+    # UTILS-19: ticking "Redact: Account numbers" puts "account" in the selected
+    # category set that scan/crop pass through to the detectors.
+    src = text_pdf_factory(["Cuenta: 0123456789"])
+    app = PdfCropApp(src)
+    async with app.run_test(size=(120, 60)) as pilot:
+        screen = app.screen
+        assert "account" not in screen._selected_categories()
+        screen.query_one("#cat_account_chk").value = True
+        await pilot.pause()
+        assert "account" in screen._selected_categories()
+
+
 async def test_screen_has_three_labeled_sections(three_page_pdf):
     app = PdfCropApp(three_page_pdf)
     async with app.run_test(size=(120, 60)) as pilot:
