@@ -410,3 +410,160 @@ def test_street_line_containing_cp_merges_to_single_match():
         assert e1 <= s2
     # The whole line is covered.
     assert any(text[m.start:m.end] == "Calle Hidalgo 45, C.P. 64000" for m in matches)
+
+
+# --- UTILS-21: label-anchored name auto-detection NEGATIVES -----------------
+# Precision over recall: bare Title-Case words with NO label cue must never be
+# auto-detected. Capitalisation is the signal, so the capture is matched on the
+# ORIGINAL text (folding would lowercase everything and destroy the cue).
+
+
+def test_bare_title_case_phrase_without_cue_not_auto_detected():
+    # Headings and ordinary capitalised phrases (no cue) must not be redacted.
+    for text in (
+        "Estado de Cuenta",
+        "Banco Nacional",
+        "Resumen de Movimientos",
+    ):
+        assert detect(text, categories={"name"}, names=[]) == [], text
+
+
+def test_month_names_without_cue_not_auto_detected():
+    # Capitalised month names sitting alone are not a labelled person name.
+    assert detect("Enero Febrero", categories={"name"}, names=[]) == []
+    assert detect("Periodo Enero a Marzo", categories={"name"}, names=[]) == []
+
+
+def test_cue_at_end_of_line_with_nothing_after_does_not_crash_or_capture():
+    # A cue with no following name must not crash or over-capture.
+    assert detect("Titular:", categories={"name"}, names=[]) == []
+    assert detect("Nombre del cliente:\n", categories={"name"}, names=[]) == []
+    assert detect("A nombre de", categories={"name"}, names=[]) == []
+
+
+def test_auto_name_capture_stops_at_line_end_no_lowercase_prose_swallowed():
+    # The capture is bounded to the name run and must not run into following
+    # lowercase prose or onto the next line.
+    text = "Titular: JUAN PÉREZ realizó el pago de mil pesos"
+    matches = detect(text, categories={"name"}, names=[])
+    assert len(matches) == 1
+    assert matches[0].text == "JUAN PÉREZ"
+
+
+def test_auto_name_does_not_cross_newline():
+    text = "Titular:\nNombre del banco"
+    # The cue's own line has no name after it; the next line is a different
+    # (cue-less) heading and must not be captured.
+    assert detect(text, categories={"name"}, names=[]) == []
+
+
+# --- UTILS-21: label-anchored name auto-detection POSITIVES -----------------
+
+
+def test_auto_detects_all_caps_name_after_titular_cue():
+    text = "Titular: JUAN PÉREZ"
+    matches = detect(text, categories={"name"}, names=[])
+    assert len(matches) == 1
+    m = matches[0]
+    assert m.category == "name"
+    assert m.text == "JUAN PÉREZ"
+    assert text[m.start:m.end] == "JUAN PÉREZ"
+
+
+def test_auto_detects_title_case_name_with_particles_after_nombre_cue():
+    text = "Nombre del cliente: María de la Cruz"
+    matches = detect(text, categories={"name"}, names=[])
+    assert len(matches) == 1
+    assert matches[0].text == "María de la Cruz"
+
+
+def test_auto_detects_name_after_each_cue_word():
+    for cue in ("Titular", "Nombre", "Cliente", "Beneficiario", "A nombre de"):
+        text = f"{cue}: Juan Pérez"
+        matches = detect(text, categories={"name"}, names=[])
+        assert [m.text for m in matches] == ["Juan Pérez"], cue
+
+
+def test_auto_detect_cue_is_case_insensitive():
+    text = "TITULAR JUAN PÉREZ"
+    matches = detect(text, categories={"name"}, names=[])
+    assert [m.text for m in matches] == ["JUAN PÉREZ"]
+
+
+def test_auto_detect_handles_enie():
+    text = "Titular: ÑOÑO MUÑOZ"
+    matches = detect(text, categories={"name"}, names=[])
+    assert [m.text for m in matches] == ["ÑOÑO MUÑOZ"]
+
+
+def test_auto_detect_capture_excludes_the_cue():
+    text = "Beneficiario: Ana López"
+    matches = detect(text, categories={"name"}, names=[])
+    assert len(matches) == 1
+    assert "Beneficiario" not in matches[0].text
+    assert matches[0].text == "Ana López"
+
+
+def test_auto_name_stops_at_first_digit():
+    text = "Titular: Juan Pérez 0123456789"
+    matches = detect(text, categories={"name"}, names=[])
+    assert [m.text for m in matches] == ["Juan Pérez"]
+
+
+def test_auto_detect_caps_at_four_words():
+    # The person-name run is bounded to 1-4 capitalised words; particles between
+    # them don't count toward the cap. Here: Juan, Carlos, Fuente, Martínez are
+    # the four words; the fifth (García) is excluded.
+    text = "Titular: Juan Carlos de la Fuente Martínez García"
+    matches = detect(text, categories={"name"}, names=[])
+    assert len(matches) == 1
+    assert matches[0].text == "Juan Carlos de la Fuente Martínez"
+    assert "García" not in matches[0].text
+
+
+def test_manual_list_name_still_matched_with_auto_detect_active():
+    # Existing manual-list behaviour must be unchanged: a name from the list is
+    # still matched even with no cue present.
+    text = "Pago a JOSE PEREZ por servicios"
+    matches = detect(text, categories={"name"}, names=["José Pérez"])
+    assert [m.text for m in matches] == ["JOSE PEREZ"]
+
+
+def test_auto_and_manual_overlap_on_same_span_collapses_to_one():
+    # A labelled name that is also on the manual list must not double-match.
+    text = "Titular: Juan Pérez"
+    matches = detect(text, categories={"name"}, names=["Juan Pérez"])
+    assert len(matches) == 1
+    assert matches[0].text == "Juan Pérez"
+
+
+def test_auto_detect_name_in_nfd_normalized_text():
+    # NFD-decomposed accented name after a cue: the run must NOT truncate at the
+    # combining accent ("Pérez" = P,e,U+0301,r,e,z). The auto-detect run matches
+    # the ORIGINAL text, so combining marks have to be allowed in a name word —
+    # regression for the surname-leak when the text layer is NFD-normalised.
+    text = unicodedata.normalize("NFD", "Titular: José Pérez García")
+    matches = detect(text, categories={"name"}, names=[])
+    assert len(matches) == 1
+    assert matches[0].text == unicodedata.normalize("NFD", "José Pérez García")
+
+
+def test_nombre_del_non_person_filler_not_auto_detected():
+    # "Nombre del <X>" is a person-name cue only when <X> is a person role
+    # (cliente/titular/beneficiario/...). A non-person filler must NOT extend the
+    # cue, so the following product/bank/heading is left untouched — otherwise
+    # "Nombre del producto: Tarjeta Oro" would redact "Tarjeta Oro".
+    for text in (
+        "Nombre del producto: Tarjeta Oro",
+        "Nombre del banco: BBVA Bancomer",
+        "Nombre del archivo: Estado Cuenta",
+    ):
+        assert detect(text, categories={"name"}, names=[]) == [], text
+
+
+def test_nombre_del_person_role_filler_still_auto_detected():
+    # The flipside of the guard: person-role fillers keep working as cues.
+    for filler in ("titular", "cliente", "beneficiario", "cuentahabiente"):
+        text = f"Nombre del {filler}: Juan Pérez"
+        matches = detect(text, categories={"name"}, names=[])
+        assert [m.text for m in matches] == ["Juan Pérez"], filler

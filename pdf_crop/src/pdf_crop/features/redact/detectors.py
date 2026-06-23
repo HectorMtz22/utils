@@ -65,6 +65,49 @@ _STREET_RE = re.compile(
 )
 
 
+# Names following a label cue (UTILS-21). The manual `names` list still drives
+# the bulk of name redaction; this auto-detects names introduced by a label so
+# the user doesn't have to type every name. Capitalisation carries the signal
+# (a person name is Title-Case or ALL-CAPS, ordinary prose is not), so this MUST
+# run on the ORIGINAL text — folding lowercases everything and destroys the cue.
+# The cue is matched case-insensitively; the captured name keeps its casing.
+#
+# Cue alternation (case-insensitive), optionally followed by ":". "A nombre de"
+# is its own cue (the bare connector "de" only counts as a particle elsewhere).
+# The "Nombre del X" filler is restricted to person-role nouns (not a bare \w+),
+# so "Nombre del cliente:" is a cue but "Nombre del producto/banco/archivo:" is
+# not — those would otherwise redact the product/bank/heading that follows.
+_NAME_CUE = (
+    r"(?:titular"
+    r"|nombre(?:\s+del?\s+(?:titular|cliente|beneficiario|cuentahabiente|solicitante|tarjetahabiente|usuario))?"
+    r"|cliente|beneficiario|a\s+nombre\s+de)"
+)
+#
+# A name "word": a leading capital (incl. Ñ/accented vowels) then letters of
+# either case (covers Title-Case "Pérez" and ALL-CAPS "PÉREZ"). [^\W\d_] is a
+# Unicode letter (no digits/underscore); the explicit class pins the first char
+# to an uppercase letter so a lowercase prose word can't start a run. Combining
+# marks (̀-ͯ) are allowed in the body so an NFD-decomposed accented
+# name ("Pérez" = P,e,combining-acute,r,e,z) isn't truncated at the accent.
+_NAME_WORD = r"[A-ZÑÁÉÍÓÚÜ](?:[^\W\d_]|[̀-ͯ])*"
+#
+# Lowercase connector particles allowed *between* name words. They don't count
+# toward the 1-4 word cap, so "Juan Carlos de la Fuente" is four name words.
+_NAME_PARTICLE = r"(?:de|del|la|las|los|y)"
+#
+# 1-4 capitalised words, particles tolerated between them. `re.IGNORECASE` is NOT
+# used (it would let lowercase words match _NAME_WORD); the cue is made
+# case-insensitive via an explicit lowercase+folded match instead — see detect().
+_NAME_RUN = (
+    rf"{_NAME_WORD}"
+    rf"(?:[ ]+(?:{_NAME_PARTICLE}[ ]+)*{_NAME_WORD}){{0,3}}"
+)
+# The cue is matched on accent/case-folded text (so "Núm"/"TITULAR" all match),
+# but the run is matched on the ORIGINAL text starting where the cue ended.
+_NAME_CUE_RE = re.compile(rf"(?<!\w){_NAME_CUE}\s*:?[ ]*")
+_NAME_RUN_RE = re.compile(_NAME_RUN)
+
+
 @dataclass(frozen=True)
 class Match:
     category: str
@@ -199,5 +242,22 @@ def detect(text, *, categories, names):
                 orig_start = text_idx_map[fstart]
                 orig_end = text_idx_map[fend - 1] + 1
                 matches.append(Match("name", orig_start, orig_end, text[orig_start:orig_end]))
+
+        # Label-anchored auto-detection: find a cue on the folded text, then match
+        # the person-name run against the ORIGINAL text right after it so the
+        # Title-Case/ALL-CAPS casing cue survives (folding would erase it).
+        for cm in _NAME_CUE_RE.finditer(folded_text):
+            fend = cm.end()
+            if fend >= len(text_idx_map):
+                continue  # cue ran to the very end — nothing follows
+            # The character just past the folded cue maps to the original start
+            # of the would-be name run.
+            orig_start = text_idx_map[fend]
+            rm = _NAME_RUN_RE.match(text, orig_start)
+            if rm is None:
+                continue
+            matches.append(
+                Match("name", rm.start(), rm.end(), text[rm.start():rm.end()])
+            )
 
     return _merge(matches)
