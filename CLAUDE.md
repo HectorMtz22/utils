@@ -12,7 +12,7 @@ There is no shared package — keep projects independent.
 | Project | What | Stack | Tests |
 |---|---|---|---|
 | [`pdf_crop/`](pdf_crop/) | CLI + TUI to extract page ranges from PDFs | Python 3.12, `uv`, pytest, textual, pypdf | `uv run pytest` (reference example) |
-| [`music-lyrics/`](music-lyrics/) | Script: fetch synced/plain lyrics from lrclib.net for a local library | Python 3.9, local `lyrics-env` venv | none yet |
+| [`music-lyrics/`](music-lyrics/) | Script: fetch synced/plain lyrics from lrclib.net for a local library | Python 3.10+, `uv`, requests, mutagen | none yet |
 | [`thermal-qr/`](thermal-qr/) | Shell script: print a QR to a macOS ESC/POS thermal printer | bash + inline `python3` | `cd thermal-qr && ./tests/run.sh` |
 | [`pxe-boot/`](pxe-boot/) | macOS CLI to PXE-boot a PC on the LAN (netboot.xyz or local ISO) | Python 3.12, `uv`, pytest | `cd pxe-boot && uv run pytest` |
 
@@ -50,8 +50,9 @@ tests/
 cd pdf_crop && uv sync && uv run pytest        # test
 uv run pdfcrop Document.pdf 1-5,8              # run
 
-# music-lyrics  (uses its own venv, not uv)
-music-lyrics/lyrics-env/bin/python music-lyrics/lyrics_on_nas.py
+# music-lyrics
+cd music-lyrics && uv sync                       # setup
+MUSIC_DIR=/path/to/music uv run python lyrics_on_nas.py   # run (default dir: /Volumes/music-library)
 
 # thermal-qr
 ./thermal-qr/print-qr.sh "https://example.com" "caption"   # CLI
