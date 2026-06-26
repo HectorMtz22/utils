@@ -1,6 +1,12 @@
 # music-lyrics
 
-Fetches synced/plain lyrics from [lrclib.net](https://lrclib.net) for a local FLAC/MP3 library. Writes a `.lrc` file next to each track.
+Fetches synced lyrics for a local FLAC/MP3 library and writes a `.lrc` file next
+to each track.
+
+[lrclib.net](https://lrclib.net) is tried first, then
+[NetEase Cloud Music](https://music.163.com) as a fallback. Only **synced**
+(timestamped) lyrics are written — tracks where only plain lyrics exist are
+reported as warnings rather than written.
 
 ```bash
 uv sync
