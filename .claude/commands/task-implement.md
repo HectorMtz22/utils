@@ -10,14 +10,21 @@ harness (see `HARNESS.md`): `worktree → TDD → verify → review → PR`. Alw
 worktrees, always use superpowers, always conventional commits. Multiple issues
 run as **parallel agents**, one worktree each.
 
+> To build the **whole backlog** in auto-planned dependency order instead of
+> naming issues, use **`/task-run`** — it wraps this same machinery with an
+> ordering layer.
+
 Requested issues (may be empty): **$ARGUMENTS**
 
 ## Plane coordinates
 
-- Project **Utils**, identifier `UTILS`, `project_id`
-  `43bbc122-c9fe-469e-9379-db02d132a5c9`.
+Read `project_code` (`UTILS`) and `project_id` from `.claude/tracker.md` — the
+single source of truth for tracker config. If that file is missing, tell the user
+to run `/harness-setup` first.
+
 - Resolve states **by name at runtime** via `mcp__plane__list_states`:
-  **"Todo"**, **"In Progress"**, **"In Review"**, **"Done"**.
+  **"Todo"**, **"In Progress"**, **"In Review"**, **"Done"**. Plane ships without
+  **In Review** — `/harness-bootstrap` creates it (or create it once by hand).
 
 ## Steps
 

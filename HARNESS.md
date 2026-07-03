@@ -1,9 +1,10 @@
 # Development Harness (TDD)
 
 The repeatable loop for shipping a change in this repo. It assumes Claude Code
-with the `superpowers` plugin and the **Plane** MCP server. It complements
-[`AGENTS.md`](AGENTS.md) (the *why* of worktrees/specs) with the *how* of TDD
-and issue tracking.
+with the `superpowers` plugin and the **Plane** MCP server (tracker coordinates
+live in [`.claude/tracker.md`](.claude/tracker.md)). It complements
+[`AGENTS.md`](AGENTS.md) (the *why* of worktrees/specs) with the *how* of TDD and
+issue tracking.
 
 Optimize for the **simplest approach that passes a test**, and **verify every
 step with real output** before moving on. **Always use superpowers** — invoke
@@ -17,13 +18,22 @@ the relevant skill at each stage rather than improvising.
 brainstorm ─▶ spec ─▶ Plane issue(s) ─▶ worktree ─▶ TDD ─▶ verify ─▶ review ─▶ PR
   (skill)    (local)   (Plane UTILS)   (gitignored) (R/G/R)  (skill)  (skill)
 └─────────── /task-init ───────────┘  └──────────── /task-implement ───────────┘
+└────────── /issues-init ──────────┘  └───────────────── /task-run ─────────────┘
+      (same, but one epic → many          (same, but reads the backlog and
+        linked issues at once)             orders the batches for you)
 ```
 
-Two slash commands drive the loop:
+Four slash commands drive the loop — two for planning, two for building, each
+pair scaling from a single task to a whole epic/backlog:
 
 - **`/task-init [description]`** — brainstorm → local spec → Plane issue(s).
-- **`/task-implement [UTILS-12 …]`** — worktree → TDD → verify → review → PR,
-  with parallel agents when there are multiple issues.
+- **`/issues-init [epic]`** — decompose an epic → many linked Plane issues
+  (blocks relations + a parent epic), so `/task-run` can order them.
+- **`/task-implement [UTILS-12 …]`** — worktree → TDD → verify → review → PR for
+  the issues you name, with parallel agents when there are multiple.
+- **`/task-run [ids|label]`** — read the backlog, plan a parallel/sequential order
+  from blocks-relations + file-overlap, then drive `/task-implement`'s machinery
+  batch by batch.
 
 Issues live in **Plane** (project **Utils** / `UTILS`). Specs and plans stay
 *local* and *gitignored* under `docs/superpowers/`; worktrees live under
@@ -32,12 +42,27 @@ the code, the Plane issue, and the PR.
 
 ---
 
+## Set up the tracker (once per repo)
+
+This repo is already provisioned on Plane, so you rarely touch these. The
+coordinates live in [`.claude/tracker.md`](.claude/tracker.md).
+
+1. **`/harness-setup`** — choose the tracker (default Plane); (re)writes
+   `.claude/tracker.md`. Only needed to change trackers.
+2. **`/harness-bootstrap`** — create/top-up the project, the
+   `Todo → In Progress → In Review → Done` states, the type labels, and the
+   weekly (Mon→Sun) cycles. Idempotent — its day-to-day use is topping up
+   future cycles.
+
+---
+
 ## 0. Decide the size
 
 - **Trivial** (one-line fix, typo, obvious tweak): skip straight to TDD on a
   worktree branch. No spec, no Plane issue.
 - **Non-trivial** (new feature, behavior change, multi-file): run the full loop
-  via `/task-init` then `/task-implement`.
+  via `/task-init` then `/task-implement` (or `/issues-init` → `/task-run` for an
+  epic).
 
 When unsure, treat it as non-trivial — a 10-line spec is cheap.
 
@@ -63,19 +88,22 @@ implementation agent works against.
 
 ## 3. Plane issue(s) — the tracker
 
-`/task-init` files the work in **Plane**, project **Utils** (`UTILS`,
-`project_id 43bbc122-c9fe-469e-9379-db02d132a5c9`). One issue ≈ one PR-sized
-chunk. Each issue gets:
+`/task-init` files the work in **Plane**, project **Utils** (`UTILS`; read
+`project_id` from `.claude/tracker.md`). One issue ≈ one PR-sized chunk. Each
+issue gets:
 
 - **State `Todo`** (resolve state ids at runtime via `list_states`).
 - A **project label** (`pdf_crop`, `music-lyrics`, `thermal-qr`, `pxe-boot`)
   and a **type label** (`feat`, `fix`, `refactor`, `test`, `docs`, `chore`) —
   resolve label ids at runtime via `list_labels`.
+- The **current weekly cycle** (new UTILS issues always go into the current
+  cycle — resolve it via `list_cycles`).
 - A description carrying the problem, approach, code map, test list, and the
   local spec filename.
 
 Use multiple independent issues to coordinate **parallel agents** — each agent
-owns one issue in its own worktree.
+owns one issue in its own worktree. For epic-scale work, `/issues-init` files the
+batch already linked so `/task-run` can order it.
 
 ## 4. Worktree — `superpowers:using-git-worktrees`
 
@@ -175,12 +203,19 @@ For work that splits cleanly, `/task-implement` runs issues concurrently:
 Keep agents on **disjoint files** — if two issues touch the same module,
 sequence them instead.
 
+**`/task-run` automates this triage.** Instead of you hand-picking the disjoint
+set, it reads the backlog, derives the batches from Plane's blocks-relations +
+file-overlap, and runs each batch through steps 2–4 above — parallel where safe,
+sequential where two issues collide. Pair it with `/issues-init`, which files the
+issues already linked so the ordering is explicit.
+
 ---
 
 ## Guardrails
 
 - **Issues in Plane; specs/plans local.** `docs/superpowers/` and `.worktrees/`
-  are gitignored — never `git add` them. The tracker is Plane (`UTILS`).
+  are gitignored — never `git add` them. The tracker is Plane (`UTILS`);
+  coordinates live in `.claude/tracker.md`.
 - **Always superpowers.** Use the named skill at each stage; don't improvise the
   workflow.
 - **Worktrees always.** Implementation never happens in the main checkout.
