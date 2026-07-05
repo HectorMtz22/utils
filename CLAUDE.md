@@ -99,8 +99,12 @@ tag-versioned project, **never edit a `version =` field by hand** (its
 
 The full loop (brainstorm → spec → Plane issue(s) → worktree → TDD → verify →
 review → PR) lives in [`HARNESS.md`](HARNESS.md) and [`AGENTS.md`](AGENTS.md),
-wrapped by two commands: **`/task-init`** (brainstorm → spec → file issues) and
-**`/task-implement`** (worktree → TDD → review → PR). Key rules:
+wrapped by four commands — a planning pair, **`/task-init`** (one task → issue(s))
+and **`/issues-init`** (one epic → many linked issues), and a building pair,
+**`/task-implement`** (issues you name → PRs) and **`/task-run`** (the whole
+backlog, auto-ordered → PRs). Tracker setup is one-time via **`/harness-setup`**
+(writes [`.claude/tracker.md`](.claude/tracker.md)) and **`/harness-bootstrap`**
+(provisions/tops-up the project, states, labels, and weekly cycles). Key rules:
 
 - **Always use superpowers.** Invoke the named skill at each stage
   (`brainstorming`, `using-git-worktrees`, `test-driven-development`,
@@ -108,10 +112,12 @@ wrapped by two commands: **`/task-init`** (brainstorm → spec → file issues) 
   `requesting-code-review`). **Report findings, don't auto-fix.**
 - **Specs and plans are local-only** under `docs/superpowers/` (gitignored).
   **Never commit them.** The committed record is the code + PR.
-- **Issues live in Plane** — project **Utils** (`UTILS`). Each issue gets a
-  project label (`pdf_crop`/`music-lyrics`/`thermal-qr`/`pxe-boot`) and a type
-  label (`feat`/`fix`/`refactor`/`test`/`docs`/`chore`); states go
-  `Todo → In Progress → In Review (PR open) → Done (merged)`. Not in local files.
+- **Issues live in Plane** — project **Utils** (`UTILS`); coordinates in
+  `.claude/tracker.md`. Each issue gets a project label
+  (`pdf_crop`/`music-lyrics`/`thermal-qr`/`pxe-boot`), a type label
+  (`feat`/`fix`/`refactor`/`test`/`docs`/`chore`), and the current weekly cycle;
+  states go `Todo → In Progress → In Review (PR open) → Done (merged)`. Not in
+  local files.
 - **Always use worktrees** under `.worktrees/` (gitignored) for implementation;
   never work in the main checkout. Multiple issues run as parallel agents, one
   worktree each.

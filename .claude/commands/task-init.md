@@ -10,15 +10,23 @@ Turn an idea into a local spec and one or more **Plane** issues, ready for
 `brainstorm → spec → Plane issue(s)`. Issues live in Plane; specs/plans stay
 local and gitignored.
 
+> Scaling up: for a broad goal that fans out into many linked issues, use
+> **`/issues-init`** (epic decomposition) instead, then **`/task-run`** to build
+> the backlog in dependency order.
+
 Task description (may be empty — ask if so): **$ARGUMENTS**
 
 ## Plane coordinates
 
-- Project **Utils**, identifier `UTILS`, `project_id`
-  `43bbc122-c9fe-469e-9379-db02d132a5c9`.
-- Resolve states and labels **by name at runtime** — don't hardcode UUIDs:
+Read `project_code` (`UTILS`) and `project_id` from `.claude/tracker.md` — the
+single source of truth for tracker config. If that file is missing, tell the user
+to run `/harness-setup` first.
+
+- Resolve states, labels, and the current cycle **by name at runtime** — don't
+  hardcode UUIDs:
   - `mcp__plane__list_states` → pick the state named **"Todo"**.
   - `mcp__plane__list_labels` → map label names to IDs.
+  - `mcp__plane__list_cycles` → pick the cycle whose date range contains today.
 
 ## Steps
 
@@ -31,7 +39,8 @@ Task description (may be empty — ask if so): **$ARGUMENTS**
 2. **Plan into PR-sized chunks.** If the spec is bigger than one PR, use
    `superpowers:writing-plans` and split it into independent, PR-sized chunks —
    one Plane issue each (this is what lets `/task-implement` run them in
-   parallel). A single-PR task is just one issue.
+   parallel). A single-PR task is just one issue. (For epic-scale work, prefer
+   `/issues-init`, which also files the blocks-relations for you.)
 
 3. **Determine labels per issue:**
    - **Project label** = the sub-project the work touches (`pdf_crop`,
@@ -43,7 +52,7 @@ Task description (may be empty — ask if so): **$ARGUMENTS**
      (`feat`, `fix`, `refactor`, `test`, `docs`, `chore`).
 
 4. **Create the Plane issue(s)** with `mcp__plane__create_work_item`:
-   - `project_id`: the UTILS id above.
+   - `project_id`: the UTILS id from `.claude/tracker.md`.
    - `name`: imperative, conventional-commit-style summary, e.g.
      `feat(pdf_crop): add page-range presets`.
    - `state`: the **Todo** state id.
@@ -52,7 +61,11 @@ Task description (may be empty — ask if so): **$ARGUMENTS**
      test list, and the local spec filename
      (`docs/superpowers/specs/...`). Keep it tight — the spec is the contract.
 
-5. **Report** each created issue's identifier (e.g. `UTILS-12`) and tell the
+5. **Add each issue to the current weekly cycle** with
+   `mcp__plane__add_work_items_to_cycle` (new UTILS issues always go into the
+   current cycle).
+
+6. **Report** each created issue's identifier (e.g. `UTILS-12`) and tell the
    user they can run `/task-implement UTILS-12 …` next.
 
 ## Guardrails
