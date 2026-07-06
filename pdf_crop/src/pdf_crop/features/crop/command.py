@@ -20,21 +20,23 @@ def run(
     strip_metadata: bool = False,
     redact_qr: bool = False,
     ocr: bool = False,
+    output: str | None = None,
 ) -> int:
     """Crop entry point. If range_expr is None, launch the TUI; otherwise direct mode.
 
-    `strip_metadata` is a deprecated alias of `sanitize`.
+    `strip_metadata` is a deprecated alias of `sanitize`. `output` is the raw
+    --output value (folder, exact filename, or both); see output_path.resolve.
     """
     sanitize = sanitize or strip_metadata
     if range_expr is None:
         from pdf_crop.app import PdfCropApp
-        return PdfCropApp(src, sanitize=sanitize).run() or 0
+        return PdfCropApp(src, sanitize=sanitize, output=output).run() or 0
 
     try:
         reader = pdf_io.open_pdf(src)
         total = pdf_io.page_count(reader)
         pages = ranges.parse(range_expr, total)
-        dest = output_path.resolve(src)
+        dest = output_path.resolve(src, output)
         result = crop_pdf(reader, pages, dest, sanitize=sanitize)
         if redact_qr:
             _redact_qr_in_place(dest)

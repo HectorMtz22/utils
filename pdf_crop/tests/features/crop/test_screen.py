@@ -21,6 +21,66 @@ def test_app_threads_sanitize_to_screen(three_page_pdf):
     assert app._sanitize is True
 
 
+def test_app_threads_output_to_screen(three_page_pdf):
+    app = PdfCropApp(three_page_pdf, output="~/out")
+    assert app._output == "~/out"
+
+
+async def test_output_input_prefilled_from_constructor_arg(three_page_pdf):
+    app = PdfCropApp(three_page_pdf, output="~/out/report.pdf")
+    async with app.run_test(size=(120, 60)) as pilot:
+        screen = app.screen
+        assert screen.query_one("#output_input").value == "~/out/report.pdf"
+
+
+async def test_output_input_blank_when_no_output_arg(three_page_pdf):
+    app = PdfCropApp(three_page_pdf)
+    async with app.run_test(size=(120, 60)) as pilot:
+        screen = app.screen
+        assert screen.query_one("#output_input").value == ""
+
+
+async def test_crop_writes_to_resolved_output_input_path(three_page_pdf, tmp_path):
+    folder = tmp_path / "somewhere"
+    app = PdfCropApp(three_page_pdf)
+    async with app.run_test(size=(120, 60)) as pilot:
+        screen = app.screen
+        screen.query_one("#range_input").value = "1"
+        screen.query_one("#output_input").value = str(folder)
+        await pilot.pause()
+        await pilot.click("#crop_btn")
+        await app.workers.wait_for_complete()
+        await pilot.pause()
+        result = str(screen.query_one("#result_msg").content)
+        assert "Wrote" in result
+
+    assert (folder / "three_cropped.pdf").exists()
+
+
+async def test_typing_output_input_does_not_clear_redaction_preview(text_pdf_factory):
+    # The output-path field doesn't affect what a redaction scan finds, so
+    # typing into it must not clear the "Found: …" preview or re-disable
+    # "Apply redaction" — unlike the category checkboxes.
+    src = text_pdf_factory(["CLABE 002010077777777771 fin"])
+    app = PdfCropApp(src)
+    async with app.run_test(size=(120, 60)) as pilot:
+        screen = app.screen
+        screen.query_one("#range_input").value = "1"
+        screen.query_one("#cat_clabe_chk").value = True
+        await pilot.pause()
+        await pilot.click("#scan_btn")
+        await app.workers.wait_for_complete()
+        await pilot.pause()
+        apply_chk = screen.query_one("#apply_redaction_chk")
+        assert apply_chk.disabled is False
+        apply_chk.value = True
+        screen.query_one("#output_input").value = "some/output/path"
+        await pilot.pause()
+        assert apply_chk.value is True
+        assert apply_chk.disabled is False
+        assert "Found" in str(screen.query_one("#preview_msg").content)
+
+
 async def test_crop_button_reachable_in_short_terminal(three_page_pdf):
     # The redact/QR/OCR/sanitize/metadata options make the form taller than a
     # normal terminal, and the action buttons sit at the very bottom. The form

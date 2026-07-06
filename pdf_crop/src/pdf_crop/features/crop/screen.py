@@ -69,12 +69,13 @@ class CropScreen(Screen):
         Binding("q,escape", "quit", "Quit"),
     ]
 
-    def __init__(self, src: Path, *, sanitize: bool = False) -> None:
+    def __init__(self, src: Path, *, sanitize: bool = False, output: str | None = None) -> None:
         super().__init__()
         self.src = src
         self.reader = pdf_io.open_pdf(src)
         self.total = pdf_io.page_count(self.reader)
         self._sanitize_default = sanitize
+        self._output_default = output or ""
         self._findings = None
 
     def compose(self) -> ComposeResult:
@@ -137,6 +138,11 @@ class CropScreen(Screen):
 
     def _output_section(self) -> Vertical:
         section = Vertical(
+            Input(
+                placeholder="folder/, name.pdf, or folder/name.pdf — blank = next to source",
+                value=self._output_default,
+                id="output_input",
+            ),
             Checkbox(
                 "Rebuild clean (strip all non-essential)",
                 value=self._sanitize_default,
@@ -225,7 +231,10 @@ class CropScreen(Screen):
     # --- events ---------------------------------------------------------------
 
     def on_input_changed(self, event: Input.Changed) -> None:
-        self._reset_preview()
+        # output_input doesn't affect what a scan would find, so it's excluded
+        # from the reset (unlike range_input / names_input, which do change it).
+        if event.input.id != "output_input":
+            self._reset_preview()
         if event.input.id != "range_input":
             return
         self._update_badge(event.value)
@@ -381,7 +390,8 @@ class CropScreen(Screen):
         self, pages, *, sanitize, apply_redaction, redact_qr, ocr, categories, names
     ) -> None:
         try:
-            dest = output_path.resolve(self.src)
+            output_value = self.query_one("#output_input", Input).value
+            dest = output_path.resolve(self.src, output_value or None)
             writer = pdf_io.build_subset(self.reader, pages, sanitize=sanitize)
             redacted = 0
             if apply_redaction and self._findings is not None:
