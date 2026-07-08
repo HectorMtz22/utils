@@ -34,6 +34,20 @@ def test_custom_suffix(tmp_path):
     assert resolve(src, suffix="_extracted") == tmp_path / "Doc_extracted.pdf"
 
 
+def test_empty_output_uses_default_next_to_source(tmp_path):
+    # A blank --output (e.g. `-o ""` or an unset shell var) falls back to the
+    # default next-to-source name, not Path(".")/the current working directory.
+    src = tmp_path / "Doc.pdf"
+    src.write_bytes(b"%PDF-1.4\n")
+    assert resolve(src, "") == tmp_path / "Doc_cropped.pdf"
+
+
+def test_whitespace_output_uses_default_next_to_source(tmp_path):
+    src = tmp_path / "Doc.pdf"
+    src.write_bytes(b"%PDF-1.4\n")
+    assert resolve(src, "   ") == tmp_path / "Doc_cropped.pdf"
+
+
 def test_folder_target_creates_dir_and_uses_default_stem(tmp_path):
     src = tmp_path / "Doc.pdf"
     src.write_bytes(b"%PDF-1.4\n")

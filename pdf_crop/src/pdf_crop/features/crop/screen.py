@@ -377,6 +377,7 @@ class CropScreen(Screen):
         self.query_one("#result_msg", Static).update("Cropping…")
         self._crop_worker(
             pages,
+            output=self.query_one("#output_input", Input).value,
             sanitize=self.query_one("#sanitize_chk", Checkbox).value,
             apply_redaction=self.query_one("#apply_redaction_chk", Checkbox).value,
             redact_qr=self.query_one("#redact_qr_chk", Checkbox).value,
@@ -387,11 +388,13 @@ class CropScreen(Screen):
 
     @work(thread=True, exit_on_error=False, group="pdf", exclusive=True)
     def _crop_worker(
-        self, pages, *, sanitize, apply_redaction, redact_qr, ocr, categories, names
+        self, pages, *, output, sanitize, apply_redaction, redact_qr, ocr, categories, names
     ) -> None:
         try:
-            output_value = self.query_one("#output_input", Input).value
-            dest = output_path.resolve(self.src, output_value or None)
+            # `output` is read on the main thread by _start_crop — this runs in a
+            # worker thread, which must not touch the DOM. resolve() treats a
+            # blank value as "no override".
+            dest = output_path.resolve(self.src, output)
             writer = pdf_io.build_subset(self.reader, pages, sanitize=sanitize)
             redacted = 0
             if apply_redaction and self._findings is not None:

@@ -40,6 +40,17 @@ async def test_output_input_blank_when_no_output_arg(three_page_pdf):
         assert screen.query_one("#output_input").value == ""
 
 
+def test_crop_worker_receives_output_from_main_thread(three_page_pdf):
+    # _crop_worker runs on a background thread (@work(thread=True)), which must
+    # not touch the DOM. The output-path value is read on the main thread in
+    # _start_crop and threaded in, so it appears as a worker parameter rather
+    # than being read via query_one inside the worker.
+    import inspect
+
+    params = inspect.signature(CropScreen._crop_worker).parameters
+    assert "output" in params
+
+
 async def test_crop_writes_to_resolved_output_input_path(three_page_pdf, tmp_path):
     folder = tmp_path / "somewhere"
     app = PdfCropApp(three_page_pdf)
