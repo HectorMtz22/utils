@@ -33,6 +33,24 @@ def test_direct_mode_dispatches_to_crop(ten_page_pdf, capsys):
     assert (ten_page_pdf.with_name("ten_cropped.pdf")).exists()
 
 
+def test_cli_output_folder_option_writes_into_folder(ten_page_pdf, tmp_path, capsys):
+    folder = tmp_path / "out"
+    rc = main([str(ten_page_pdf), "1-2", "-o", str(folder)])
+    assert rc == 0
+
+    expected = folder / "ten_cropped.pdf"
+    assert expected.exists()
+    assert capsys.readouterr().out.strip() == str(expected)
+
+
+def test_cli_output_file_option_writes_exact_name(ten_page_pdf, tmp_path, capsys):
+    dest = tmp_path / "report.pdf"
+    rc = main([str(ten_page_pdf), "1-2", "--output", str(dest)])
+    assert rc == 0
+    assert dest.exists()
+    assert capsys.readouterr().out.strip() == str(dest)
+
+
 @zbar_skip.SKIP
 def test_cli_redact_qr_flag_removes_qr_from_output(qr_pdf_factory, capsys):
     from PIL import Image

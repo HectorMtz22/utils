@@ -10,6 +10,31 @@ uv run pdfcrop Document.pdf 1-5,8      # direct mode (no TUI)
 
 Output: `Document_cropped.pdf` next to the source. If it exists, suffixed `(1)`, `(2)`, …
 
+## Choosing the output location
+
+By default the cropped PDF is written next to the source, as
+`<name>_cropped.pdf`. Use `-o`/`--output` (CLI) or the **Output path** field
+(TUI) to send it somewhere else — a folder, an exact filename, or both. A
+`.pdf` extension (case-insensitive) is the only signal that decides which:
+
+```bash
+uv run pdfcrop Document.pdf 1-5,8 -o ~/out              # folder: ~/out/Document_cropped.pdf
+uv run pdfcrop Document.pdf 1-5,8 -o report.pdf          # exact file: ./report.pdf
+uv run pdfcrop Document.pdf 1-5,8 -o ~/out/report.pdf    # folder + file: ~/out/report.pdf
+```
+
+| `--output` value      | Interpreted as        | Result                                   |
+|-----------------------|------------------------|-------------------------------------------|
+| *(omitted)*           | —                      | `<src_dir>/<stem>_cropped.pdf`             |
+| `~/out` or `~/out/`   | folder                 | `~/out/<stem>_cropped.pdf`                 |
+| `reports/2026`        | folder (created)       | `reports/2026/<stem>_cropped.pdf`          |
+| `report.pdf`          | exact file             | `./report.pdf` (relative to cwd)           |
+| `~/out/report.pdf`    | folder **and** file    | `~/out/report.pdf`                         |
+
+Missing folders are created automatically; `~` is expanded. Just like the
+default location, the tool **never overwrites** — a collision auto-suffixes
+`(1)`, `(2)`, … even on an explicit filename.
+
 ## The TUI
 
 Running `pdfcrop` on a file with no range opens a **two-pane** terminal UI:
@@ -25,6 +50,7 @@ grouped controls on the left, a live preview of the current page on the right.
 │ [ ] Names     │  │                          │
 │ [Scan]        │  └──────────────────────────┘
 ├ Output ───────┤
+│ [ path input ]│
 │ [ ] Rebuild   │
 └───────────────┘
         [ Crop ]   [ Cancel ]
@@ -35,8 +61,10 @@ The left pane groups controls into three sections:
 - **Pages** — type a page range (`1-5,8,11-13`), validated as you type.
 - **Redaction** — the CLABE / card / RFC-CURP / name detectors, plus the
   *Redact QR/barcodes* and *OCR scan* toggles (see the sections below).
-- **Output** — *Rebuild clean* (strip non-essential metadata) and *List
-  metadata* (print an inventory of what's in the file).
+- **Output** — an **Output path** field (folder, exact filename, or both —
+  same rules as `-o`/`--output` above; blank writes next to the source),
+  *Rebuild clean* (strip non-essential metadata), and *List metadata* (print an
+  inventory of what's in the file).
 
 The right **preview** renders the actual page as an image. Step through pages
 with `< prev` / `next >` or the arrow keys; the badge reads `Page X/Y` and

@@ -36,6 +36,17 @@ def test_direct_mode_writes_cropped_file(ten_page_pdf, capsys):
     assert out == str(expected)
 
 
+def test_direct_mode_output_kwarg_threads_through(ten_page_pdf, tmp_path, capsys):
+    folder = tmp_path / "out"
+    rc = run(ten_page_pdf, "1-3,5", output=str(folder))
+    assert rc == 0
+
+    expected = folder / "ten_cropped.pdf"
+    assert expected.exists()
+    assert page_count(open_pdf(expected)) == 4
+    assert capsys.readouterr().out.strip() == str(expected)
+
+
 def test_direct_mode_auto_suffix_on_collision(ten_page_pdf, capsys):
     (ten_page_pdf.parent / "ten_cropped.pdf").write_bytes(b"%PDF-1.4\n")
     rc = run(ten_page_pdf, "1-3")

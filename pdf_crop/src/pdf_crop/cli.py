@@ -64,6 +64,13 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="OCR scanned/image-only pages and redact CLABE/card/RFC/CURP text.",
     )
+    parser.add_argument(
+        "-o",
+        "--output",
+        default=None,
+        help="Where to write the output: a folder, an exact .pdf filename, or "
+        "both. Default: next to the source, as <stem>_cropped.pdf.",
+    )
     args = parser.parse_args(argv)
 
     try:
@@ -86,5 +93,10 @@ def main(argv: list[str] | None = None) -> int:
 
     sanitize = args.sanitize or args.remove_metadata
     return crop_run(
-        args.file, args.range, sanitize=sanitize, redact_qr=args.redact_qr, ocr=args.ocr
+        args.file,
+        args.range,
+        sanitize=sanitize,
+        redact_qr=args.redact_qr,
+        ocr=args.ocr,
+        output=args.output,
     )

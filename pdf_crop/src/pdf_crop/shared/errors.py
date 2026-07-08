@@ -24,3 +24,7 @@ class QrRedactionFailed(PdfCropError):
 
 class OcrRedactionFailed(PdfCropError):
     """The OCR second pass failed (render, OCR, or redact error)."""
+
+
+class OutputPathError(PdfCropError):
+    """The requested --output path could not be prepared (mkdir/permission)."""
