@@ -116,6 +116,12 @@ def main(argv: list[str] | None = None) -> int:
         "(CLABE/account/card/RFC/CURP/address, or the --redact selection).",
     )
     parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Preview what redaction would remove (text/QR/OCR) and exit "
+        "without writing or creating anything.",
+    )
+    parser.add_argument(
         "-o",
         "--output",
         default=None,
@@ -158,4 +164,5 @@ def main(argv: list[str] | None = None) -> int:
         output=args.output,
         categories=categories,
         names=_parse_names(args.names),
+        dry_run=args.dry_run,
     )
