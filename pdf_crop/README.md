@@ -144,6 +144,25 @@ a plain crop still prints just the output path.
 `--redact` and `--names` also drive the `--ocr` pass (below) when combined with
 it — otherwise `--ocr` alone uses its automatic categories.
 
+Add `--dry-run` to **preview** what would be removed without writing or creating
+anything (the CLI analog of the TUI **Scan** button). It scans the selected
+pages for whichever options are active (`--redact`/`--names`, `--redact-qr`,
+`--ocr`), prints a report, and exits 0 — no output file, no folders created.
+
+```bash
+uv run pdfcrop Document.pdf 1-5 --redact --redact-qr --dry-run
+```
+
+```text
+Scan (no output written):
+  text: 3 clabe, 2 name (5 total)
+  QR: 1 code
+    QRCODE 'https://pay.me/abc'
+```
+
+With no redaction option selected, `--dry-run` just notes there's nothing to
+preview.
+
 ## QR codes / barcodes
 
 Bank statements often embed CLABE / account / payment data in a **QR code or

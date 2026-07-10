@@ -250,6 +250,101 @@ def test_cli_redact_prints_summary_line(text_pdf_factory, capsys):
     assert str(dest) in out
 
 
+def test_cli_dry_run_redact_previews_counts_without_writing(text_pdf_factory, capsys):
+    """`--dry-run --redact` prints per-category counts and writes nothing."""
+    src = text_pdf_factory(["CLABE 002010077777777771"])
+    rc = main([str(src), "1", "--redact", "--dry-run"])
+    assert rc == 0
+
+    out = capsys.readouterr().out
+    assert "1 clabe" in out
+    assert not src.with_name(f"{src.stem}_cropped.pdf").exists()
+
+
+def test_cli_dry_run_redact_qr_previews_payload_without_writing(ten_page_pdf, monkeypatch, capsys):
+    """`--dry-run --redact-qr` prints each decoded payload and writes nothing.
+
+    Monkeypatches qr_service.scan so the test doesn't need the native zbar lib.
+    """
+    from pdf_crop.features.qr_redact import service as qr_service
+
+    payload = "https://pay.me/abc123"
+
+    def fake_scan(path, pages=None):
+        findings = qr_service.QrFindings()
+        findings.codes.append(
+            qr_service.QrCode(page=1, symbology="QRCODE", payload=payload, rect=None)
+        )
+        return findings
+
+    monkeypatch.setattr(qr_service, "scan", fake_scan)
+
+    rc = main([str(ten_page_pdf), "1", "--redact-qr", "--dry-run"])
+    assert rc == 0
+
+    out = capsys.readouterr().out
+    assert payload in out
+    assert not ten_page_pdf.with_name("ten_cropped.pdf").exists()
+
+
+def test_cli_dry_run_without_options_prints_nothing_to_preview(ten_page_pdf, capsys):
+    """`--dry-run` with no redaction option prints a one-liner and writes nothing."""
+    rc = main([str(ten_page_pdf), "1", "--dry-run"])
+    assert rc == 0
+
+    out = capsys.readouterr().out
+    assert "nothing to preview" in out.lower()
+    assert not ten_page_pdf.with_name("ten_cropped.pdf").exists()
+
+
+def test_cli_dry_run_bad_range_returns_2(ten_page_pdf, capsys):
+    """A bad range still exits 2 under --dry-run (error path unchanged)."""
+    rc = main([str(ten_page_pdf), "abc", "--redact", "--dry-run"])
+    assert rc == 2
+    assert "error:" in capsys.readouterr().err
+    assert not ten_page_pdf.with_name("ten_cropped.pdf").exists()
+
+
+def test_cli_dry_run_ocr_previews_counts_without_writing(ten_page_pdf, monkeypatch, capsys):
+    """`--dry-run --ocr` prints the OCR category counts and writes nothing.
+
+    Monkeypatches ocr_service.scan so the test doesn't need the tesseract binary.
+    """
+    from pdf_crop.features.ocr_redact import service as ocr_service
+
+    def fake_scan(path, pages=None, *, categories, names):
+        findings = ocr_service.OcrFindings()
+        findings.matches.append(
+            ocr_service.OcrMatch(page=1, category="clabe", text="0020100...", rects=())
+        )
+        return findings
+
+    monkeypatch.setattr(ocr_service, "scan", fake_scan)
+
+    rc = main([str(ten_page_pdf), "1", "--ocr", "--dry-run"])
+    assert rc == 0
+
+    out = capsys.readouterr().out
+    assert "OCR" in out
+    assert "1 clabe" in out
+    assert not ten_page_pdf.with_name("ten_cropped.pdf").exists()
+
+
+def test_cli_dry_run_qr_scan_failure_returns_2(ten_page_pdf, monkeypatch, capsys):
+    """A QR scan failure under --dry-run is translated to error: + exit 2."""
+    from pdf_crop.features.qr_redact import service as qr_service
+
+    def boom(path, pages=None):
+        raise RuntimeError("zbar exploded")
+
+    monkeypatch.setattr(qr_service, "scan", boom)
+
+    rc = main([str(ten_page_pdf), "1", "--redact-qr", "--dry-run"])
+    assert rc == 2
+    assert "error:" in capsys.readouterr().err
+    assert not ten_page_pdf.with_name("ten_cropped.pdf").exists()
+
+
 def test_cli_remove_metadata_flag_strips_info(pdf_with_metadata, capsys):
     rc = main([str(pdf_with_metadata), "1", "--remove-metadata"])
     assert rc == 0

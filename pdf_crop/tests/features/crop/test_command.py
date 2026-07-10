@@ -257,6 +257,27 @@ def test_run_without_redaction_flags_is_terse_and_skips_redact(text_pdf_factory,
     assert capsys.readouterr().out.strip() == str(src.with_name(f"{src.stem}_cropped.pdf"))
 
 
+def test_run_dry_run_writes_nothing_and_skips_redact(text_pdf_factory, monkeypatch, capsys):
+    """`dry_run=True` scans for the preview but never builds/writes/redacts: the
+    writer pipeline (build_subset, redact) must not run and no file is created."""
+    from pdf_crop.features.redact import service as redact_service
+    from pdf_crop.shared import pdf_io
+
+    def no_build(*a, **k):
+        raise AssertionError("build_subset must not run in dry-run")
+
+    def no_redact(*a, **k):
+        raise AssertionError("redact must not run in dry-run")
+
+    monkeypatch.setattr(pdf_io, "build_subset", no_build)
+    monkeypatch.setattr(redact_service, "redact", no_redact)
+
+    src = text_pdf_factory(["CLABE 002010077777777771"])
+    rc = run(src, "1", categories={"clabe"}, dry_run=True)
+    assert rc == 0
+    assert not src.with_name(f"{src.stem}_cropped.pdf").exists()
+
+
 def test_run_passes_sanitize_through(pdf_with_metadata, capsys):
     from pdf_crop.features.sanitize.service import inventory
 
