@@ -213,6 +213,50 @@ def test_redact_ocr_skips_only_when_no_categories(ten_page_pdf, monkeypatch):
     assert len(calls) == 1
 
 
+def test_run_with_categories_redacts_text_layer(text_pdf_factory, capsys):
+    src = text_pdf_factory(["CLABE 002010077777777771"])
+    rc = run(src, "1", categories={"clabe"})
+    assert rc == 0
+
+    out = src.with_name(f"{src.stem}_cropped.pdf")
+    assert "002010077777777771" not in open_pdf(out).pages[0].extract_text()
+
+
+def test_run_names_only_implies_name_category(text_pdf_factory, monkeypatch):
+    """Passing `names` but no `categories` still redacts the `name` category —
+    detectors gate the whole name branch behind `"name" in categories`."""
+    from pdf_crop.features.redact import service as redact_service
+
+    calls = {}
+
+    def fake_redact(writer, *, categories, names):
+        calls["categories"] = categories
+        return 0
+
+    monkeypatch.setattr(redact_service, "redact", fake_redact)
+
+    src = text_pdf_factory(["hello"])
+    rc = run(src, "1", names=["Zoe"])
+    assert rc == 0
+    assert "name" in calls["categories"]
+
+
+def test_run_without_redaction_flags_is_terse_and_skips_redact(text_pdf_factory, monkeypatch, capsys):
+    """No categories/names → plain crop: redact_service.redact is never called and
+    stdout is exactly the dest path (byte-for-byte legacy behavior)."""
+    from pdf_crop.features.redact import service as redact_service
+
+    def boom(*a, **k):
+        raise AssertionError("redact must not run without categories/names")
+
+    monkeypatch.setattr(redact_service, "redact", boom)
+
+    src = text_pdf_factory(["CLABE 002010077777777771"])
+    rc = run(src, "1")
+    assert rc == 0
+    assert capsys.readouterr().out.strip() == str(src.with_name(f"{src.stem}_cropped.pdf"))
+
+
 def test_run_passes_sanitize_through(pdf_with_metadata, capsys):
     from pdf_crop.features.sanitize.service import inventory
 

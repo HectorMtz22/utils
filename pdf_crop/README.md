@@ -120,6 +120,30 @@ range or any category clears the preview, so you always confirm a fresh scan.
 generated documents, such as bank statements). Scanned or image-only pages have
 no extractable text — the preview will report that and remove nothing.
 
+### Redaction (CLI)
+
+The CLI redacts the same text layer with `--redact`. Bare `--redact` (or
+`--redact all`) removes **every** category; pass a comma-separated subset to
+narrow it (case-insensitive, whitespace tolerated). The categories are
+`clabe`, `account`, `card`, `rfc`, `curp`, `address`, and `name`.
+
+```bash
+uv run pdfcrop Document.pdf 1-5 --redact                 # redact every category
+uv run pdfcrop Document.pdf 1-5 --redact clabe,card      # only CLABE + card numbers
+uv run pdfcrop Document.pdf 1-5 --names "José Pérez,Ana" # delete these literal names
+uv run pdfcrop Document.pdf 1-5 --redact clabe --names "José Pérez"
+```
+
+`--names` takes comma-separated literal names to delete (matched case- and
+accent-insensitively) and **implies** the `name` category, so it works with or
+without `--redact`. An unknown category is rejected with a non-zero exit and
+nothing is written. When something is redacted the CLI prints a one-line
+summary, e.g. `Redacted 5 items: 3 clabe, 2 name → Document_cropped.pdf`;
+a plain crop still prints just the output path.
+
+`--redact` and `--names` also drive the `--ocr` pass (below) when combined with
+it — otherwise `--ocr` alone uses its automatic categories.
+
 ## QR codes / barcodes
 
 Bank statements often embed CLABE / account / payment data in a **QR code or
@@ -164,18 +188,20 @@ suite still runs on a machine without it.
 Scanned statements have **no text layer**, so the text-layer detectors above
 find nothing. A separate OCR pass renders each page, reads it with `tesseract`
 (via `pytesseract`), reconstructs the page text while tracking every word's
-bounding box, runs the same CLABE / card / RFC / CURP detectors over that text,
-and applies a **true** PyMuPDF redaction over each matched word — the text is
-removed from the image, not just covered.
+bounding box, runs the same CLABE / account / card / RFC / CURP / address
+detectors over that text, and applies a **true** PyMuPDF redaction over each
+matched word — the text is removed from the image, not just covered.
 
 ```bash
 uv run pdfcrop Document.pdf 1-5 --ocr   # crop, then OCR-redact scanned pages
 ```
 
-`--ocr` scans the automatic categories (CLABE, card, RFC, CURP). In the TUI,
-tick **OCR scan (for scanned pages)**: the second pass uses the category
-checkboxes you've selected plus the *names* field, so it can also redact names
-on scanned pages. Like the QR pass, this runs over the already-cropped output.
+`--ocr` alone scans the automatic categories (CLABE, account, card, RFC, CURP,
+address). Combine it with `--redact`/`--names` to drive the OCR pass with that
+exact selection instead. In the TUI, tick **OCR scan (for scanned pages)**: the
+second pass uses the category checkboxes you've selected plus the *names* field,
+so it can also redact names on scanned pages. Like the QR pass, this runs over
+the already-cropped output.
 
 ### Native dependency: tesseract
 
