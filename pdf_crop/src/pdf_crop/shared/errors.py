@@ -28,3 +28,7 @@ class OcrRedactionFailed(PdfCropError):
 
 class OutputPathError(PdfCropError):
     """The requested --output path could not be prepared (mkdir/permission)."""
+
+
+class InvalidRedactCategory(PdfCropError):
+    """A --redact value named a category that isn't recognised."""

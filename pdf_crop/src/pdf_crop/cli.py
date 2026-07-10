@@ -3,12 +3,15 @@ from pathlib import Path
 import argparse
 import sys
 
-from pdf_crop.shared.errors import NotAPdf, SourceNotFound
+from pdf_crop.shared.errors import InvalidRedactCategory, NotAPdf, SourceNotFound
 from pdf_crop.features.crop.command import run as crop_run
 from pdf_crop.features.sanitize import service as sanitize_service
 from pdf_crop.shared import pdf_io
 
 PDF_MAGIC = b"%PDF"
+
+# The canonical text-layer redaction categories (mirrors detectors.detect).
+CANONICAL_CATEGORIES = {"clabe", "account", "card", "rfc", "curp", "address", "name"}
 
 
 def _validate_pdf(path: Path) -> None:
@@ -20,6 +23,36 @@ def _validate_pdf(path: Path) -> None:
         header = f.read(4)
     if header != PDF_MAGIC:
         raise NotAPdf(f"file missing PDF header: {path}")
+
+
+def _parse_categories(value: str) -> set[str]:
+    """Parse a --redact value into a set of canonical categories.
+
+    "all" (case-insensitive) expands to every category. Otherwise the value is a
+    comma-separated, case-insensitive list; whitespace is stripped. An unknown
+    token raises InvalidRedactCategory.
+    """
+    if value.strip().lower() == "all":
+        return set(CANONICAL_CATEGORIES)
+    result: set[str] = set()
+    for token in value.split(","):
+        token = token.strip().lower()
+        if not token:
+            continue
+        if token not in CANONICAL_CATEGORIES:
+            valid = ", ".join(sorted(CANONICAL_CATEGORIES))
+            raise InvalidRedactCategory(
+                f"unknown redact category: {token!r} (valid: {valid}, all)"
+            )
+        result.add(token)
+    return result
+
+
+def _parse_names(value: str | None) -> list[str] | None:
+    """Split a --names value into stripped, non-empty literals (None → None)."""
+    if value is None:
+        return None
+    return [name.strip() for name in value.split(",") if name.strip()]
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -60,9 +93,27 @@ def main(argv: list[str] | None = None) -> int:
         help="Detect and remove QR codes / barcodes from the output PDF.",
     )
     parser.add_argument(
+        "--redact",
+        nargs="?",
+        const="all",
+        default=None,
+        metavar="CATS",
+        help="Redact PII from the text layer. Bare or 'all' redacts every "
+        "category; or pass a comma-separated subset of "
+        "clabe,account,card,rfc,curp,address,name.",
+    )
+    parser.add_argument(
+        "--names",
+        default=None,
+        metavar='"A,B"',
+        help="Comma-separated literal names to delete (implies the 'name' "
+        "category).",
+    )
+    parser.add_argument(
         "--ocr",
         action="store_true",
-        help="OCR scanned/image-only pages and redact CLABE/card/RFC/CURP text.",
+        help="OCR scanned/image-only pages and redact sensitive text "
+        "(CLABE/account/card/RFC/CURP/address, or the --redact selection).",
     )
     parser.add_argument(
         "-o",
@@ -91,6 +142,12 @@ def main(argv: list[str] | None = None) -> int:
             print(f"total: {inv.total()}")
         return 0
 
+    try:
+        categories = _parse_categories(args.redact) if args.redact is not None else None
+    except InvalidRedactCategory as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 2
+
     sanitize = args.sanitize or args.remove_metadata
     return crop_run(
         args.file,
@@ -99,4 +156,6 @@ def main(argv: list[str] | None = None) -> int:
         redact_qr=args.redact_qr,
         ocr=args.ocr,
         output=args.output,
+        categories=categories,
+        names=_parse_names(args.names),
     )

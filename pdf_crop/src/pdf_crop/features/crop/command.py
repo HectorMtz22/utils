@@ -2,13 +2,13 @@ from pathlib import Path
 import os
 import sys
 
+from pdf_crop.features.redact import service as redact_service
 from pdf_crop.shared import ranges, pdf_io, output_path
 from pdf_crop.shared.errors import PdfCropError, QrRedactionFailed, OcrRedactionFailed
 
-from .service import crop_pdf
-
-# Categories the OCR pass scans by default from the CLI. `name` needs a names
-# list the CLI can't provide, so it's omitted there (the TUI passes its own).
+# Categories the OCR pass scans by default from the CLI when no --redact/--names
+# was given. `name` needs a names list, so it's omitted from this legacy default
+# (an explicit --redact/--names selection overrides it — see run()).
 OCR_CLI_CATEGORIES = {"clabe", "account", "card", "rfc", "curp", "address"}
 
 
@@ -21,33 +21,87 @@ def run(
     redact_qr: bool = False,
     ocr: bool = False,
     output: str | None = None,
+    categories: set[str] | None = None,
+    names: list[str] | None = None,
 ) -> int:
     """Crop entry point. If range_expr is None, launch the TUI; otherwise direct mode.
 
     `strip_metadata` is a deprecated alias of `sanitize`. `output` is the raw
     --output value (folder, exact filename, or both); see output_path.resolve.
+    `categories` are the parsed --redact categories and `names` the --names
+    literals; text-layer redaction runs iff their union (with `name` implied by a
+    non-empty `names`) is non-empty.
     """
     sanitize = sanitize or strip_metadata
     if range_expr is None:
         from pdf_crop.app import PdfCropApp
         return PdfCropApp(src, sanitize=sanitize, output=output).run() or 0
 
+    categories = set(categories or ())
+    names = list(names or ())
+    # A non-empty --names implies the `name` category — detectors.detect gates the
+    # entire name branch behind `"name" in categories`, so without this --names
+    # would be silently ignored.
+    effective = categories | ({"name"} if names else set())
+
+    # OCR source: the effective selection when the user asked for redaction,
+    # else the legacy automatic categories with no names (backward-compat).
+    if effective:
+        ocr_cats, ocr_names = effective, names
+    else:
+        ocr_cats, ocr_names = OCR_CLI_CATEGORIES, []
+
     try:
         reader = pdf_io.open_pdf(src)
         total = pdf_io.page_count(reader)
         pages = ranges.parse(range_expr, total)
         dest = output_path.resolve(src, output)
-        result = crop_pdf(reader, pages, dest, sanitize=sanitize)
-        if redact_qr:
-            _redact_qr_in_place(dest)
-        if ocr:
-            _redact_ocr_in_place(dest, categories=OCR_CLI_CATEGORIES, names=[])
+
+        writer = pdf_io.build_subset(reader, pages, sanitize=sanitize)
+        breakdown: dict[str, int] = {}
+        if effective:
+            # Scan first for the per-category summary, then redact the writer in
+            # place (same pages, so counts agree — no double redaction).
+            breakdown = redact_service.scan(
+                reader, pages, categories=effective, names=names
+            ).summary()
+            redact_service.redact(writer, categories=effective, names=names)
+        with dest.open("wb") as f:
+            writer.write(f)
+        qr_removed = _redact_qr_in_place(dest) if redact_qr else 0
+        ocr_removed = (
+            _redact_ocr_in_place(dest, categories=ocr_cats, names=ocr_names)
+            if ocr
+            else 0
+        )
     except PdfCropError as e:
         print(f"error: {e}", file=sys.stderr)
         return 2
 
-    print(result)
+    _print_result(dest, breakdown, qr_removed, ocr_removed)
     return 0
+
+
+def _print_result(dest, breakdown: dict[str, int], qr_removed: int, ocr_removed: int) -> None:
+    """Report the outcome on stdout.
+
+    When nothing was redacted, print just the dest path (the legacy terse output
+    that tests pin). Otherwise print a one-line redaction summary.
+    """
+    text_total = sum(breakdown.values())
+    if not (text_total or qr_removed or ocr_removed):
+        print(dest)
+        return
+
+    parts = []
+    if breakdown:
+        parts.append(", ".join(f"{n} {cat}" for cat, n in sorted(breakdown.items())))
+    if qr_removed:
+        parts.append(f"{qr_removed} QR")
+    if ocr_removed:
+        parts.append(f"{ocr_removed} OCR")
+    total = text_total + qr_removed + ocr_removed
+    print(f"Redacted {total} items: {'; '.join(parts)} → {dest}")
 
 
 def _redact_qr_in_place(dest: Path) -> int:
