@@ -81,13 +81,8 @@ def run(
                 reader, pages, categories=effective, names=names
             ).summary()
             redact_service.redact(writer, categories=effective, names=names)
-        with dest.open("wb") as f:
-            writer.write(f)
-        qr_removed = _redact_qr_in_place(dest) if redact_qr else 0
-        ocr_removed = (
-            _redact_ocr_in_place(dest, categories=ocr_cats, names=ocr_names)
-            if ocr
-            else 0
+        qr_removed, ocr_removed = _write_output(
+            writer, dest, redact_qr=redact_qr, ocr=ocr, categories=ocr_cats, names=ocr_names
         )
     except PdfCropError as e:
         print(f"error: {e}", file=sys.stderr)
@@ -192,6 +187,32 @@ def _print_dry_run(
             print("  OCR: none found")
 
     return 0
+
+
+def _write_output(writer, dest: Path, *, redact_qr: bool, ocr: bool, categories, names) -> tuple[int, int]:
+    """Write the crop to `dest` and run the second passes. Returns (qr, ocr) removed.
+
+    `dest` only survives if everything succeeds: a file left behind by a failed
+    or interrupted pass (Ctrl-C included) would still hold the data the user asked
+    to remove. output_path.resolve never reuses a name, so `dest` is always this
+    run's own file. If it can't be deleted, the error says where it is.
+    """
+    try:
+        with dest.open("wb") as f:
+            writer.write(f)
+        qr_removed = _redact_qr_in_place(dest) if redact_qr else 0
+        ocr_removed = (
+            _redact_ocr_in_place(dest, categories=categories, names=names) if ocr else 0
+        )
+    except BaseException as e:
+        try:
+            dest.unlink(missing_ok=True)
+        except OSError as unlink_error:
+            raise PdfCropError(
+                f"{e}; could not delete incomplete output {dest}: {unlink_error}"
+            ) from e
+        raise
+    return qr_removed, ocr_removed
 
 
 def _redact_qr_in_place(dest: Path) -> int:

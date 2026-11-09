@@ -182,6 +182,10 @@ data before cropping. By default **every** detected code is redacted.
 This runs as a second pass over the already-cropped output, so the text-layer
 crop/redaction pipeline is untouched.
 
+If the QR or OCR pass fails or is interrupted, the output file is deleted rather
+than left on disk with the data still in it. The command reports the error and
+exits non-zero.
+
 ### Native dependency: zbar
 
 Decoding needs the native `zbar` library (via `pyzbar`). On macOS:
