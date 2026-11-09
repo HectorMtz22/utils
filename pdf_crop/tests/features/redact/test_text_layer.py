@@ -15,16 +15,14 @@ def test_page_text_reconstructs_drawn_string(text_pdf_factory):
 
 def test_delete_spans_removes_target_keeps_neighbors(text_pdf_factory, tmp_path):
     src = text_pdf_factory(["CLABE 002010077777777771 here"])
-    reader = open_pdf(src)
-    page = reader.pages[0]
+    writer = PdfWriter()
+    page = writer.add_page(open_pdf(src).pages[0])
     text, _ = text_layer.page_text(page)
     start = text.index("002010077777777771")
     end = start + len("002010077777777771")
 
     text_layer.delete_spans(page, [(start, end)])
 
-    writer = PdfWriter()
-    writer.add_page(page)
     out = tmp_path / "redacted.pdf"
     with out.open("wb") as f:
         writer.write(f)
@@ -38,12 +36,11 @@ def test_delete_spans_removes_target_keeps_neighbors(text_pdf_factory, tmp_path)
 def test_delete_spans_only_affects_targeted_span(text_pdf_factory, tmp_path):
     src = text_pdf_factory(["Alpha 002010077777777771", "Beta keepme"])
     reader = open_pdf(src)
-    p0 = reader.pages[0]
+    w = PdfWriter()
+    p0 = w.add_page(reader.pages[0])
     text, _ = text_layer.page_text(p0)
     s = text.index("002010077777777771")
     text_layer.delete_spans(p0, [(s, s + 18)])
-    w = PdfWriter()
-    w.add_page(p0)
     w.add_page(reader.pages[1])
     out = tmp_path / "r.pdf"
     with out.open("wb") as f:

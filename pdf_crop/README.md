@@ -10,6 +10,22 @@ uv run pdfcrop Document.pdf 1-5,8      # direct mode (no TUI)
 
 Output: `Document_cropped.pdf` next to the source. If it exists, suffixed `(1)`, `(2)`, …
 
+## Install
+
+To run `pdfcrop` from any folder, install it as a global tool from a checkout:
+
+```bash
+brew install uv zbar tesseract        # zbar: QR redaction, tesseract: OCR
+cd pdf_crop
+uv tool install --force --reinstall .
+uv tool update-shell                  # adds pdfcrop to PATH; restart the shell
+pdfcrop --version
+```
+
+`uv tool install` doesn't read `uv.lock`: it installs the newest versions
+`pyproject.toml` allows. `uv sync` / `uv run` use the hash-pinned lockfile
+instead.
+
 ## Choosing the output location
 
 By default the cropped PDF is written next to the source, as
@@ -192,11 +208,12 @@ brew install zbar
 
 `pyzbar` looks for the dylib on the dynamic-linker path, which doesn't include
 Homebrew's prefix by default. If you hit `Unable to find zbar shared library`,
-point it at the Homebrew install:
+point it at the Homebrew install for that command only. Don't export it from your
+shell profile, where it would affect the library lookup of every program you run:
 
 ```bash
-export DYLD_LIBRARY_PATH=/opt/homebrew/opt/zbar/lib   # Apple silicon
-# export DYLD_LIBRARY_PATH=/usr/local/opt/zbar/lib    # Intel
+DYLD_LIBRARY_PATH=/opt/homebrew/opt/zbar/lib pdfcrop Document.pdf 1-5 --redact-qr   # Apple silicon
+# DYLD_LIBRARY_PATH=/usr/local/opt/zbar/lib pdfcrop Document.pdf 1-5 --redact-qr    # Intel
 ```
 
 The QR tests skip automatically when `zbar` isn't available, so the rest of the
