@@ -10,6 +10,36 @@ uv run pdfcrop Document.pdf 1-5,8      # direct mode (no TUI)
 
 Output: `Document_cropped.pdf` next to the source. If it exists, suffixed `(1)`, `(2)`, …
 
+## Install as a global tool
+
+To get a `pdfcrop` command on your `PATH` (no `uv run`, works from any
+directory), install it with [`uv tool`](https://docs.astral.sh/uv/concepts/tools/)
+from a checkout of this repo:
+
+```bash
+cd pdf_crop
+uv tool install .
+pdfcrop --version
+pdfcrop Document.pdf 1-5,8
+```
+
+If `pdfcrop` isn't found afterwards, run `uv tool update-shell` and restart your
+shell so uv's tool bin directory is on `PATH`.
+
+To upgrade after pulling new commits or a new release tag, rebuild from source:
+
+```bash
+cd pdf_crop
+uv tool install --force --reinstall .
+```
+
+Plain `--force` reuses the already-installed build, so `pdfcrop --version` would
+keep reporting the old version; `--reinstall` rebuilds it and picks up the
+tag-derived version. To remove it: `uv tool uninstall pdf-crop`.
+
+The QR and OCR features still need the native `zbar` and `tesseract` libraries
+(see below).
+
 ## Choosing the output location
 
 By default the cropped PDF is written next to the source, as
