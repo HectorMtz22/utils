@@ -301,3 +301,50 @@ def test_leftward_same_line_cell_is_a_known_fusion_limitation(raw_content_stream
     )
     text, _ = text_layer._walk(cs)
     assert text == "1234567890"  # fused — known limitation, not a regression
+
+
+# --- /ToUnicode fonts (subset TrueType, e.g. Hey Banco statements) ---------
+
+
+def test_page_text_decodes_tounicode_font(tounicode_pdf_factory):
+    """Raw glyph codes are scrambled; the walker must decode via /ToUnicode."""
+    src = tounicode_pdf_factory(["CLABE 002010077777777771 here"])
+    page = open_pdf(src).pages[0]
+    text, charmap = text_layer.page_text(page)
+    assert "CLABE 002010077777777771 here" in text
+    assert len(charmap) == len(text)
+
+
+def test_delete_spans_removes_target_in_tounicode_font(tounicode_pdf_factory, tmp_path):
+    src = tounicode_pdf_factory(["CLABE 002010077777777771 here"])
+    page = open_pdf(src).pages[0]
+    text, _ = text_layer.page_text(page)
+    start = text.index("002010077777777771")
+
+    text_layer.delete_spans(page, [(start, start + 18)])
+
+    writer = PdfWriter()
+    writer.add_page(page)
+    out = tmp_path / "redacted.pdf"
+    with out.open("wb") as f:
+        writer.write(f)
+    extracted = open_pdf(out).pages[0].extract_text()
+    assert "002010077777777771" not in extracted
+    assert "7777" not in extracted
+    assert "CLABE" in extracted
+    assert "here" in extracted
+
+
+def test_parse_tounicode_handles_bfchar_bfrange_and_two_byte_codes():
+    cmap = (
+        b"1 begincodespacerange <0000> <FFFF> endcodespacerange\n"
+        b"2 beginbfchar\n<0003> <0020>\n<0011> <00660069>\nendbfchar\n"
+        b"2 beginbfrange\n<0013> <0015> <0030>\n<0024> <0025> [<0041> <0042>]\nendbfrange\n"
+    )
+    code_len, mapping = text_layer.parse_tounicode(cmap)
+    assert code_len == 2
+    assert mapping[b"\x00\x03"] == " "
+    assert mapping[b"\x00\x11"] == "fi"  # ligature: one glyph -> two chars
+    assert [mapping[bytes([0, c])] for c in (0x13, 0x14, 0x15)] == ["0", "1", "2"]
+    assert mapping[b"\x00\x24"] == "A"
+    assert mapping[b"\x00\x25"] == "B"
