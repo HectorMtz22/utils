@@ -1,8 +1,9 @@
 # Development Harness (TDD)
 
 The repeatable loop for shipping a change in this repo. It assumes Claude Code
-with the `superpowers` plugin and the **Plane** MCP server (tracker coordinates
-live in [`.claude/tracker.md`](.claude/tracker.md)). It complements
+with the `superpowers` plugin, and an **Obsidian Kanban** board of Markdown
+issues outside the repo (location and format live in
+[`.claude/tracker.md`](.claude/tracker.md)). It complements
 [`AGENTS.md`](AGENTS.md) (the *why* of worktrees/specs) with the *how* of TDD and
 issue tracking.
 
@@ -15,8 +16,8 @@ the relevant skill at each stage rather than improvising.
 ## The loop at a glance
 
 ```
-brainstorm ─▶ spec ─▶ Plane issue(s) ─▶ worktree ─▶ TDD ─▶ verify ─▶ review ─▶ PR
-  (skill)    (local)   (Plane UTILS)   (gitignored) (R/G/R)  (skill)  (skill)
+brainstorm ─▶ spec ─▶   issue(s)    ─▶ worktree ─▶ TDD ─▶ verify ─▶ review ─▶ PR
+  (skill)    (local)   (Kanban UTILS)  (gitignored) (R/G/R)  (skill)  (skill)
 └─────────── /task-init ───────────┘  └──────────── /task-implement ───────────┘
 └────────── /issues-init ──────────┘  └───────────────── /task-run ─────────────┘
       (same, but one epic → many          (same, but reads the backlog and
@@ -26,40 +27,39 @@ brainstorm ─▶ spec ─▶ Plane issue(s) ─▶ worktree ─▶ TDD ─▶ v
 Four slash commands drive the loop — two for planning, two for building, each
 pair scaling from a single task to a whole epic/backlog:
 
-- **`/task-init [description]`** — brainstorm → local spec → Plane issue(s).
-- **`/issues-init [epic]`** — decompose an epic → many linked Plane issues
-  (blocks relations + a parent epic), so `/task-run` can order them.
-- **`/task-implement [UTILS-12 …]`** — worktree → TDD → verify → review → PR for
+- **`/task-init [description]`** — brainstorm → local spec → issue(s).
+- **`/issues-init [epic]`** — decompose an epic → many linked issues
+  (`blocked_by` links + a parent epic note), so `/task-run` can order them.
+- **`/task-implement [UTILS-100 …]`** — worktree → TDD → verify → review → PR for
   the issues you name, with parallel agents when there are multiple.
-- **`/task-run [ids|label]`** — read the backlog, plan a parallel/sequential order
-  from blocks-relations + file-overlap, then drive `/task-implement`'s machinery
+- **`/task-run [ids|tag]`** — read the backlog, plan a parallel/sequential order
+  from `blocked_by` + file-overlap, then drive `/task-implement`'s machinery
   batch by batch.
 
-Issues live in **Plane** (project **Utils** / `UTILS`). Specs and plans stay
+Issues live on the **Obsidian Kanban board** at `~/tracker/issues/utils`
+(`UTILS-<n>` notes + `Utils.md`, synced with Syncthing). Specs and plans stay
 *local* and *gitignored* under `docs/superpowers/`; worktrees live under
 `.worktrees/` (also gitignored). **Never commit either.** The durable record is
-the code, the Plane issue, and the PR.
+the code, the issue note, and the PR.
 
 ---
 
 ## Set up the tracker (once per repo)
 
-This repo is already provisioned on Plane, so you rarely touch these. The
-coordinates live in [`.claude/tracker.md`](.claude/tracker.md).
+The location and format live in [`.claude/tracker.md`](.claude/tracker.md).
 
-1. **`/harness-setup`** — choose the tracker (default Plane); (re)writes
-   `.claude/tracker.md`. Only needed to change trackers.
-2. **`/harness-bootstrap`** — create/top-up the project, the
-   `Todo → In Progress → In Review → Done` states, the type labels, and the
-   weekly (Mon→Sun) cycles. Idempotent — its day-to-day use is topping up
-   future cycles.
+1. **`/harness-setup`** — choose the tracker (default Obsidian Kanban);
+   (re)writes `.claude/tracker.md`. Only needed to change trackers.
+2. **`/harness-bootstrap`** — create the issues folder, the board with its
+   `Todo → In Progress → In Review → Done` lanes, and the Syncthing ignores.
+   Idempotent — run it on a new machine if the folder hasn't synced yet.
 
 ---
 
 ## 0. Decide the size
 
 - **Trivial** (one-line fix, typo, obvious tweak): skip straight to TDD on a
-  worktree branch. No spec, no Plane issue.
+  worktree branch. No spec, no issue.
 - **Non-trivial** (new feature, behavior change, multi-file): run the full loop
   via `/task-init` then `/task-implement` (or `/issues-init` → `/task-run` for an
   epic).
@@ -86,20 +86,18 @@ Gitignored. Keep it short: problem, chosen approach, the code map (files to
 touch), and the test list (what proves it works). This is the contract the
 implementation agent works against.
 
-## 3. Plane issue(s) — the tracker
+## 3. Issue(s) — the tracker
 
-`/task-init` files the work in **Plane**, project **Utils** (`UTILS`; read
-`project_id` from `.claude/tracker.md`). One issue ≈ one PR-sized chunk. Each
-issue gets:
+`/task-init` files the work on the **Obsidian Kanban board** (folder and format
+in `.claude/tracker.md`). One issue ≈ one PR-sized chunk. Each issue gets:
 
-- **State `Todo`** (resolve state ids at runtime via `list_states`).
-- A **project label** (`pdf_crop`, `music-lyrics`, `thermal-qr`, `pxe-boot`)
-  and a **type label** (`feat`, `fix`, `refactor`, `test`, `docs`, `chore`) —
-  resolve label ids at runtime via `list_labels`.
-- The **current weekly cycle** (new UTILS issues always go into the current
-  cycle — resolve it via `list_cycles`).
-- A description carrying the problem, approach, code map, test list, and the
-  local spec filename.
+- A **note** `UTILS-<n>-<slug>.md` with `project` (`pdf_crop`, `music-lyrics`,
+  `thermal-qr`, `pxe-boot`) and `type` (`feat`, `fix`, `refactor`, `test`,
+  `docs`, `chore`) in its frontmatter, and a body carrying the problem,
+  approach, code map, test list, and the local spec filename.
+- A **card** in the board's `Todo` lane, tagged `#<project> #<type>`. The lane
+  the card is in *is* the state — drag it in Obsidian or let the commands move
+  it.
 
 Use multiple independent issues to coordinate **parallel agents** — each agent
 owns one issue in its own worktree. For epic-scale work, `/issues-init` files the
@@ -177,8 +175,9 @@ Run `superpowers:requesting-code-review` on the branch before any PR.
 Open a PR **automatically** as soon as a branch is **verified, green, committed,
 and clean**: no Important+ findings outstanding, the full suite passing, and the
 working tree clean. No need to ask first. Conventional-commit title with scope
-(`feat(pdf_crop): …`). One feature per PR. Then move the Plane issue to
-**In Review**; set it to **Done** when the PR merges.
+(`feat(pdf_crop): …`). One feature per PR. Then set the note's `pr:` and move
+the card to **In Review**; it moves to **Done** when the PR merges (the next
+`/task-implement` or `/task-run` syncs merged PRs, or drag it yourself).
 
 Only the PR-open step is automatic — the review *fix* decision still waits for
 the user (§7).
@@ -189,22 +188,22 @@ the user (§7).
 
 For work that splits cleanly, `/task-implement` runs issues concurrently:
 
-1. `/task-init` files N independent Plane issues (disjoint files).
+1. `/task-init` files N independent issues (disjoint files).
 2. Create N worktrees (one per issue) via `superpowers:using-git-worktrees`.
 3. Dispatch one subagent per worktree in a **single message** so they run
    concurrently (`superpowers:dispatching-parallel-agents` +
-   `subagent-driven-development`). Each agent gets: its Plane issue + spec, its
+   `subagent-driven-development`). Each agent gets: its issue note + spec, its
    worktree path, a "don't touch the main checkout or other worktrees"
    instruction, the code map, and a "report back briefly" instruction.
 4. The parent verifies each diff + test run, then reviews and PRs them
-   independently, moving each Plane issue to `In Review` on PR-open (and to
-   `Done` when it merges).
+   independently, moving each card to `In Review` on PR-open (and to `Done`
+   when it merges). Only the parent edits the board.
 
 Keep agents on **disjoint files** — if two issues touch the same module,
 sequence them instead.
 
 **`/task-run` automates this triage.** Instead of you hand-picking the disjoint
-set, it reads the backlog, derives the batches from Plane's blocks-relations +
+set, it reads the backlog, derives the batches from the notes' `blocked_by` +
 file-overlap, and runs each batch through steps 2–4 above — parallel where safe,
 sequential where two issues collide. Pair it with `/issues-init`, which files the
 issues already linked so the ordering is explicit.
@@ -213,9 +212,10 @@ issues already linked so the ordering is explicit.
 
 ## Guardrails
 
-- **Issues in Plane; specs/plans local.** `docs/superpowers/` and `.worktrees/`
-  are gitignored — never `git add` them. The tracker is Plane (`UTILS`);
-  coordinates live in `.claude/tracker.md`.
+- **Issues on the Kanban board; specs/plans local.** `docs/superpowers/` and
+  `.worktrees/` are gitignored — never `git add` them. The tracker is the
+  Obsidian Kanban folder (`UTILS`); location and format live in
+  `.claude/tracker.md`.
 - **Always superpowers.** Use the named skill at each stage; don't improvise the
   workflow.
 - **Worktrees always.** Implementation never happens in the main checkout.
