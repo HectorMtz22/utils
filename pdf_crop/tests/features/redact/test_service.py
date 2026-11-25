@@ -139,3 +139,9 @@ def test_redact_keeps_image_layer_and_does_not_blank_page(tmp_path):
 
     # ...and the sensitive text is gone.
     assert "002010077777777771" not in open_pdf(out).pages[0].extract_text()
+
+
+def test_scan_finds_clabe_in_tounicode_font_pdf(tounicode_pdf_factory):
+    reader = open_pdf(tounicode_pdf_factory(["CLABE 002010077777777771"]))
+    findings = service.scan(reader, [1], categories={"clabe"}, names=[])
+    assert findings.summary() == {"clabe": 1}

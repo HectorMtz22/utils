@@ -91,6 +91,54 @@ def text_pdf_factory(tmp_path):
     return _factory
 
 
+
+@pytest.fixture
+def tounicode_pdf_factory(tmp_path):
+    """PDF whose text is only readable through the font's /ToUnicode CMap.
+
+    tounicode_pdf_factory(["line a", "line b"]) -> Path. Mimics a subset TrueType
+    font (e.g. Hey Banco statements): each distinct character is assigned a
+    scrambled glyph code starting at 0x21 in order of first appearance, so the
+    raw content-stream bytes read as `!"#$%…` and only the CMap maps them back
+    to real text.
+    """
+    def _factory(lines):
+        codes = {}
+        for ch in "".join(lines):
+            codes.setdefault(ch, 0x21 + len(codes))
+        ranges = "".join(
+            f"<{code:02X}> <{code:02X}> <{ord(ch):04X}>\n" for ch, code in codes.items()
+        )
+        cmap = DecodedStreamObject()
+        cmap.set_data((
+            "/CIDInit /ProcSet findresource begin\n12 dict begin\nbegincmap\n"
+            "1 begincodespacerange\n<00> <FF>\nendcodespacerange\n"
+            f"{len(codes)} beginbfrange\n{ranges}endbfrange\n"
+            "endcmap\nCMapName currentdict /CMap defineresource pop\nend\nend\n"
+        ).encode())
+
+        writer = PdfWriter()
+        font = DictionaryObject({
+            NameObject("/Type"): NameObject("/Font"),
+            NameObject("/Subtype"): NameObject("/TrueType"),
+            NameObject("/BaseFont"): NameObject("/AAAAAC+Subset"),
+            NameObject("/ToUnicode"): writer._add_object(cmap),
+        })
+        for line in lines:
+            page = writer.add_blank_page(width=612, height=792)
+            page[NameObject("/Resources")] = DictionaryObject({
+                NameObject("/Font"): DictionaryObject({NameObject("/TT2"): font}),
+            })
+            hexed = "".join(f"{codes[ch]:02X}" for ch in line)
+            content = DecodedStreamObject()
+            content.set_data(f"BT /TT2 12 Tf 72 720 Td <{hexed}> Tj ET".encode())
+            page[NameObject("/Contents")] = writer._add_object(content)
+        path = tmp_path / "tounicode.pdf"
+        with path.open("wb") as f:
+            writer.write(f)
+        return path
+    return _factory
+
 def _xmp_stream() -> DecodedStreamObject:
     stream = DecodedStreamObject()
     stream.set_data(_XMP_PAYLOAD)
