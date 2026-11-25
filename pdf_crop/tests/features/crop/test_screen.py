@@ -145,6 +145,9 @@ async def test_list_metadata_button_renders_inventory(pdf_with_metadata):
     app = PdfCropApp(pdf_with_metadata)
     async with app.run_test(size=(120, 60)) as pilot:
         screen = app.screen
+        # The controls pane scrolls; bring the button on-screen before clicking.
+        screen.query_one("#list_metadata_btn").scroll_visible(animate=False)
+        await pilot.pause()
         await pilot.click("#list_metadata_btn")
         await pilot.pause()
         msg = str(screen.query_one("#metadata_msg").content)
@@ -604,3 +607,96 @@ async def test_typing_in_input_does_not_trigger_crop(three_page_pdf):
         assert "Wrote" not in str(screen.query_one("#result_msg").content)
         assert app.is_running is True
         assert not list(three_page_pdf.parent.glob("*_cropped*.pdf"))
+
+
+_CATEGORY_IDS = (
+    "#cat_clabe_chk",
+    "#cat_account_chk",
+    "#cat_card_chk",
+    "#cat_rfccurp_chk",
+    "#cat_address_chk",
+    "#cat_name_chk",
+)
+
+
+async def test_select_all_ticks_every_category(three_page_pdf):
+    app = PdfCropApp(three_page_pdf)
+    async with app.run_test(size=(120, 60)) as pilot:
+        screen = app.screen
+        screen.query_one("#select_all_chk").value = True
+        await pilot.pause()
+        assert all(screen.query_one(i).value for i in _CATEGORY_IDS)
+
+
+async def test_select_all_untick_clears_every_category(three_page_pdf):
+    app = PdfCropApp(three_page_pdf)
+    async with app.run_test(size=(120, 60)) as pilot:
+        screen = app.screen
+        screen.query_one("#select_all_chk").value = True
+        await pilot.pause()
+        screen.query_one("#select_all_chk").value = False
+        await pilot.pause()
+        assert not any(screen.query_one(i).value for i in _CATEGORY_IDS)
+
+
+async def test_ticking_all_categories_by_hand_ticks_select_all(three_page_pdf):
+    app = PdfCropApp(three_page_pdf)
+    async with app.run_test(size=(120, 60)) as pilot:
+        screen = app.screen
+        for chk_id in _CATEGORY_IDS:
+            assert screen.query_one("#select_all_chk").value is False
+            screen.query_one(chk_id).value = True
+            await pilot.pause()
+        assert screen.query_one("#select_all_chk").value is True
+
+
+async def test_unticking_one_category_unticks_only_select_all(three_page_pdf):
+    app = PdfCropApp(three_page_pdf)
+    async with app.run_test(size=(120, 60)) as pilot:
+        screen = app.screen
+        screen.query_one("#select_all_chk").value = True
+        await pilot.pause()
+        screen.query_one("#cat_card_chk").value = False
+        await pilot.pause()
+        assert screen.query_one("#select_all_chk").value is False
+        others = [i for i in _CATEGORY_IDS if i != "#cat_card_chk"]
+        assert all(screen.query_one(i).value for i in others)
+
+
+async def test_select_all_resets_scan_preview_once(text_pdf_factory, monkeypatch):
+    src = text_pdf_factory(["CLABE 002010077777777771 fin"])
+    app = PdfCropApp(src)
+    async with app.run_test(size=(120, 60)) as pilot:
+        screen = app.screen
+        screen.query_one("#range_input").value = "1"
+        screen.query_one("#cat_clabe_chk").value = True
+        await pilot.pause()
+        await pilot.click("#scan_btn")
+        await app.workers.wait_for_complete()
+        await pilot.pause()
+        apply_chk = screen.query_one("#apply_redaction_chk")
+        assert apply_chk.disabled is False
+        apply_chk.value = True
+        await pilot.pause()
+        calls = []
+        original = screen._reset_preview
+        monkeypatch.setattr(screen, "_reset_preview", lambda: (calls.append(1), original()))
+        screen.query_one("#select_all_chk").value = True
+        await pilot.pause()
+        assert apply_chk.value is False
+        assert apply_chk.disabled is True
+        assert str(screen.query_one("#preview_msg").content) == ""
+        assert len(calls) == 1
+
+
+async def test_categories_group_holds_select_all_and_categories(three_page_pdf):
+    app = PdfCropApp(three_page_pdf)
+    async with app.run_test(size=(120, 60)) as pilot:
+        screen = app.screen
+        group = screen.query_one("#redact_categories")
+        assert group.border_title == "Categories"
+        assert group in screen.query_one("#redaction_section").children
+        for chk_id in ("#select_all_chk", *_CATEGORY_IDS):
+            assert group.query_one(chk_id)
+        for chk_id in ("#redact_qr_chk", "#ocr_chk", "#names_input", "#scan_btn"):
+            assert not group.query(chk_id)

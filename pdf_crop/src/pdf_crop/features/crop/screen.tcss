@@ -19,6 +19,14 @@
     height: auto;
 }
 
+/* A nested group inside a section (e.g. redact Categories): lighter border. */
+.subsection {
+    border: round $primary 50%;
+    border-title-color: $text-muted;
+    padding: 0 1;
+    height: auto;
+}
+
 #pages_hint {
     color: $text-muted;
 }

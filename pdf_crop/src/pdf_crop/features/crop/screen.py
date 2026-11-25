@@ -114,13 +114,20 @@ class CropScreen(Screen):
         return section
 
     def _redaction_section(self) -> Vertical:
-        section = Vertical(
+        categories = Vertical(
+            Checkbox("Select all", id="select_all_chk"),
             Checkbox("Redact: CLABE", id="cat_clabe_chk"),
             Checkbox("Redact: Account numbers", id="cat_account_chk"),
             Checkbox("Redact: Card numbers", id="cat_card_chk"),
             Checkbox("Redact: RFC/CURP", id="cat_rfccurp_chk"),
             Checkbox("Redact: Addresses", id="cat_address_chk"),
             Checkbox("Redact: Names", id="cat_name_chk"),
+            classes="subsection",
+            id="redact_categories",
+        )
+        categories.border_title = "Categories"
+        section = Vertical(
+            categories,
             Input(
                 placeholder="extra names to redact (labelled names auto-detected)",
                 id="names_input",
@@ -250,7 +257,21 @@ class CropScreen(Screen):
             error_msg.update(f"[red]{e}[/red]")
 
     def on_checkbox_changed(self, event: Checkbox.Changed) -> None:
-        if event.checkbox.id in self._CATEGORY_CHECKBOX_IDS:
+        # Master and categories set each other's values under prevent(), so the
+        # Changed messages those writes post are dropped: no ping-pong, and the
+        # preview resets once per click rather than once per category.
+        if event.checkbox.id == "select_all_chk":
+            with self.prevent(Checkbox.Changed):
+                for chk_id in self._CATEGORY_CHECKBOX_IDS:
+                    self.query_one(f"#{chk_id}", Checkbox).value = event.value
+            self._reset_preview()
+        elif event.checkbox.id in self._CATEGORY_CHECKBOX_IDS:
+            all_on = all(
+                self.query_one(f"#{chk_id}", Checkbox).value
+                for chk_id in self._CATEGORY_CHECKBOX_IDS
+            )
+            with self.prevent(Checkbox.Changed):
+                self.query_one("#select_all_chk", Checkbox).value = all_on
             self._reset_preview()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
