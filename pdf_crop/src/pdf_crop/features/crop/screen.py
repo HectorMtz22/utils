@@ -401,13 +401,8 @@ class CropScreen(Screen):
                 redacted = redact_service.redact(
                     writer, categories=categories, names=names
                 )
-            with dest.open("wb") as f:
-                writer.write(f)
-            qr_removed = command._redact_qr_in_place(dest) if redact_qr else 0
-            ocr_removed = (
-                command._redact_ocr_in_place(dest, categories=categories, names=names)
-                if ocr
-                else 0
+            qr_removed, ocr_removed = command._write_output(
+                writer, dest, redact_qr=redact_qr, ocr=ocr, categories=categories, names=names
             )
         except PdfCropError as e:
             self.app.call_from_thread(self._crop_error, str(e))

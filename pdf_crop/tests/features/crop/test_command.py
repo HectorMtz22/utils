@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 
 from pdf_crop.features.crop.command import (
@@ -8,6 +10,7 @@ from pdf_crop.features.crop.command import (
 )
 from pdf_crop.features.qr_redact import service as qr_service
 from pdf_crop.features.ocr_redact import service as ocr_service
+from pdf_crop.shared import pdf_io
 from pdf_crop.shared.errors import PdfCropError
 from pdf_crop.shared.pdf_io import open_pdf, page_count
 
@@ -286,3 +289,96 @@ def test_run_passes_sanitize_through(pdf_with_metadata, capsys):
 
     expected = pdf_with_metadata.with_name("with_metadata_xmp_cropped.pdf")
     assert inventory(open_pdf(expected)).total() == 0
+
+
+def _cropped_outputs(src):
+    return sorted(p.name for p in src.parent.glob(f"{src.stem}_cropped*"))
+
+
+def _raiser(exc):
+    def boom(*a, **k):
+        raise exc
+
+    return boom
+
+
+def test_run_deletes_output_when_qr_pass_fails(ten_page_pdf, monkeypatch, capsys):
+    """A failed QR pass must not leave a PDF that still contains the codes."""
+    monkeypatch.setattr(
+        qr_service, "scan", _raiser(ImportError("Unable to find zbar shared library"))
+    )
+
+    rc = run(ten_page_pdf, "1-3", redact_qr=True)
+
+    assert rc == 2
+    assert "zbar" in capsys.readouterr().err
+    assert _cropped_outputs(ten_page_pdf) == []
+
+
+def test_run_deletes_output_when_ocr_fails_after_qr_succeeds(ten_page_pdf, monkeypatch, capsys):
+    monkeypatch.setattr(qr_service, "scan", lambda *a, **k: qr_service.QrFindings())
+    monkeypatch.setattr(ocr_service, "scan", _raiser(ValueError("tesseract failure")))
+
+    rc = run(ten_page_pdf, "1-3", redact_qr=True, ocr=True)
+
+    assert rc == 2
+    assert _cropped_outputs(ten_page_pdf) == []
+
+
+def test_run_deletes_output_when_interrupted_during_pass(ten_page_pdf, monkeypatch):
+    """Ctrl-C during a slow OCR pass still counts as an incomplete redaction."""
+    monkeypatch.setattr(ocr_service, "scan", _raiser(KeyboardInterrupt()))
+
+    with pytest.raises(KeyboardInterrupt):
+        run(ten_page_pdf, "1-3", ocr=True)
+
+    assert _cropped_outputs(ten_page_pdf) == []
+
+
+def test_run_deletes_partial_output_when_write_fails(ten_page_pdf, monkeypatch, capsys):
+    class PartialWriter:
+        def write(self, f):
+            f.write(b"%PDF-1.4\npartial")
+            raise PdfCropError("disk full")
+
+    monkeypatch.setattr(pdf_io, "build_subset", lambda *a, **k: PartialWriter())
+
+    rc = run(ten_page_pdf, "1-3")
+
+    assert rc == 2
+    assert _cropped_outputs(ten_page_pdf) == []
+
+
+def test_run_failure_keeps_earlier_output(ten_page_pdf, monkeypatch, capsys):
+    """Only this run's file is deleted, never an earlier crop with a similar name."""
+    earlier = ten_page_pdf.with_name("ten_cropped.pdf")
+    earlier.write_bytes(b"earlier crop")
+    monkeypatch.setattr(qr_service, "scan", _raiser(ValueError("decode failure")))
+
+    rc = run(ten_page_pdf, "1-3", redact_qr=True)
+
+    assert rc == 2
+    assert _cropped_outputs(ten_page_pdf) == ["ten_cropped.pdf"]
+    assert earlier.read_bytes() == b"earlier crop"
+
+
+def test_run_names_leftover_output_when_delete_fails(ten_page_pdf, monkeypatch, capsys):
+    """If the unredacted file can't be deleted, the error must say where it is."""
+    monkeypatch.setattr(qr_service, "scan", _raiser(ValueError("decode failure")))
+    monkeypatch.setattr(Path, "unlink", _raiser(PermissionError("read-only")))
+
+    rc = run(ten_page_pdf, "1-3", redact_qr=True)
+
+    err = capsys.readouterr().err
+    assert rc == 2
+    assert "decode failure" in err
+    assert "ten_cropped.pdf" in err
+
+
+def test_run_keeps_output_when_passes_succeed(ten_page_pdf, monkeypatch, capsys):
+    monkeypatch.setattr(qr_service, "scan", lambda *a, **k: qr_service.QrFindings())
+
+    rc = run(ten_page_pdf, "1-3", redact_qr=True)
+
+    assert rc == 0
+    assert _cropped_outputs(ten_page_pdf) == ["ten_cropped.pdf"]

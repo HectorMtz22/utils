@@ -604,3 +604,27 @@ async def test_typing_in_input_does_not_trigger_crop(three_page_pdf):
         assert "Wrote" not in str(screen.query_one("#result_msg").content)
         assert app.is_running is True
         assert not list(three_page_pdf.parent.glob("*_cropped*.pdf"))
+
+
+async def test_crop_deletes_output_on_qr_second_pass_failure(text_pdf_factory, monkeypatch):
+    # The TUI shares the CLI's guarantee: a failed pass leaves no output behind.
+    from pdf_crop.features.qr_redact import service as qr_service
+
+    def boom(*a, **k):
+        raise ImportError("Unable to find zbar shared library")
+
+    monkeypatch.setattr(qr_service, "scan", boom)
+
+    src = text_pdf_factory(["some text"])
+    app = PdfCropApp(src)
+    async with app.run_test(size=(120, 60)) as pilot:
+        screen = app.screen
+        screen.query_one("#range_input").value = "1"
+        screen.query_one("#redact_qr_chk").value = True
+        await pilot.pause()
+        await pilot.click("#crop_btn")
+        await app.workers.wait_for_complete()
+        await pilot.pause()
+        assert "zbar" in str(screen.query_one("#error_msg").content)
+
+    assert not src.with_name(f"{src.stem}_cropped.pdf").exists()
